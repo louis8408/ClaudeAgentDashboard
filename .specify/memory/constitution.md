@@ -20,11 +20,18 @@ by Domain/Application, and Infrastructure implements it.
 Tests are written before the implementation they cover. A new test MUST be
 confirmed failing before the code that makes it pass is written.
 Red-Green-Refactor is followed strictly — no implementation commits without
-a preceding failing test that justifies them.
+a preceding failing test that justifies them. This applies to the Domain,
+Application, and Infrastructure layers. The Presentation layer (Avalonia
+views, tray icon wiring, composition root) is validated instead through the
+manual quickstart scenarios each feature plan defines — see Principle III.
 
 ### III. Three-Layer Test Coverage
-Every non-trivial module ships with all three test layers, not unit tests
-alone:
+Every non-trivial Domain, Application, or Infrastructure module ships with
+all three test layers below, not unit tests alone. Presentation-layer code
+is intentionally not held to this per-layer split: Avalonia views and tray
+wiring are thin composition code best validated end-to-end, so each feature
+plan's quickstart.md scenarios are the required, mandatory check for that
+layer instead of a fourth test-project category.
 - **Unit tests**: individual classes/functions in isolation, with external
   dependencies (OS APIs, process enumeration, notification services) faked
   or mocked behind Domain-owned interfaces.
@@ -107,4 +114,15 @@ and reviews must verify compliance with Principles I–V; any deviation must
 be justified in that feature's plan under Complexity Tracking rather than
 silently absorbed.
 
-**Version**: 1.0.0 | **Ratified**: 2026-08-06 | **Last Amended**: 2026-08-06
+**Version**: 1.1.0 | **Ratified**: 2026-08-06 | **Last Amended**: 2026-08-06
+
+## Amendment History
+
+- **1.1.0** (2026-08-06): Clarified Principles II–III to explicitly scope
+  the test-first/three-layer requirement to Domain, Application, and
+  Infrastructure; Presentation-layer correctness is validated via each
+  feature's mandatory quickstart.md manual scenarios instead of a fourth
+  test-project category. Prompted by `/speckit-analyze` on the Agent Tray
+  Dashboard feature surfacing that no Presentation task had a preceding
+  test and no test layer was defined for it — a scope gap, not a rule to
+  relax by exception.

@@ -100,6 +100,20 @@ Prerequisite: hooks registered.
 4. **Expected**: The detail view updates in place to reflect the new
    activity without being reopened.
 
+### 5. Idle resource footprint (SC-006)
+
+1. With no agents running (or agents idle) and the dashboard's own window
+   closed, let the app sit in the tray/menu bar for several minutes.
+2. Sample CPU and memory usage of the dashboard process (Task Manager /
+   Activity Monitor) at rest, and note whether any other running
+   application shows perceptible slowdown attributable to the dashboard.
+3. **Expected**: The dashboard's idle CPU usage stays negligible (no
+   sustained non-zero CPU between poll/status-check intervals) and no
+   other application's responsiveness is perceptibly affected (SC-006).
+   Record the observed idle CPU/memory figures for the record — SC-006 has
+   no fixed numeric threshold (see spec.md), so this is a qualitative
+   pass/fail judgment call, not an automated gate.
+
 ## Skipping hook setup
 
 Repeat scenarios 1 and 2 without registering hooks.
