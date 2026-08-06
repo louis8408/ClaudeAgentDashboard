@@ -16,6 +16,7 @@ namespace ClaudeAgentDashboard.Presentation;
 public partial class App : Avalonia.Application
 {
     private TrayIcon.TrayIconController? _trayIconController;
+    private DesktopWindow? _desktopWindow;
 
     public IServiceProvider Services { get; private set; } = null!;
 
@@ -46,12 +47,26 @@ public partial class App : Avalonia.Application
 
     private void OpenDashboard()
     {
+        if (_desktopWindow is not null)
+        {
+            _desktopWindow.WindowState = WindowState.Normal;
+            _desktopWindow.Activate();
+            return;
+        }
+
         var openDashboardQuery = Services.GetRequiredService<OpenDashboardQuery>();
         var showAgentCommand = Services.GetRequiredService<ShowAgentCommand>();
         var dismissAgentCommand = Services.GetRequiredService<DismissAgentCommand>();
         var viewAgentActivityQuery = Services.GetRequiredService<ViewAgentActivityQuery>();
-        var window = new AgentListWindow(openDashboardQuery, showAgentCommand, dismissAgentCommand, viewAgentActivityQuery);
-        window.Show();
-        window.Activate();
+        var viewAgentTranscriptQuery = Services.GetRequiredService<ViewAgentTranscriptQuery>();
+        var settingsStore = Services.GetRequiredService<ISettingsStore>();
+        var hookRegistrar = Services.GetRequiredService<IHookRegistrar>();
+        var hookListenerBaseAddress = Services.GetRequiredService<HookListenerAddress>().Value;
+        _desktopWindow = new DesktopWindow(
+            openDashboardQuery, showAgentCommand, dismissAgentCommand, viewAgentActivityQuery, viewAgentTranscriptQuery,
+            settingsStore, hookRegistrar, hookListenerBaseAddress);
+        _desktopWindow.Closed += (_, _) => _desktopWindow = null;
+        _desktopWindow.Show();
+        _desktopWindow.Activate();
     }
 }

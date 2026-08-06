@@ -7,29 +7,35 @@
 ## Summary
 
 A cross-platform (Windows + macOS) background application with a system
-tray/menu-bar icon that lists currently detected Claude Code CLI agent
-sessions — each showing whether it is working, idle, waiting for input, or
-ended — lets the user jump to any agent's terminal window or view a
-detail summary of what it's doing, and raises an OS-native notification —
-click-to-focus — the moment an agent stops actively working (idle, needs
-input, or its session ends), never while it continues working. Session
-presence/lifecycle is detected passively via OS process/window
-observation; fine-grained activity is sourced from Claude Code's own hook
-events via a one-time local setup step, ingested over a loopback-only HTTP
-listener the app hosts. Built in C#/.NET with Avalonia UI, structured as
-four Clean Architecture layers (Domain/Application/Infrastructure/
-Presentation) with platform-specific and hook-ingestion interop isolated
-entirely in Infrastructure behind Domain-owned interfaces, developed
-test-first with unit, integration, and architecture test layers per the
-project constitution.
+tray/menu-bar icon that presents currently detected Claude Code CLI agent
+sessions as freely rearrangeable cards on a customizable virtual-desktop
+surface — each card showing at a glance whether it is working, idle,
+waiting for input, or ended — lets the user click a card to open an
+in-window detail overlay (current output/activity, status, and actions
+like Show/Dismiss) without leaving the dashboard, and raises an OS-native
+notification — click-to-focus — the moment an agent stops actively working
+(idle, needs input, or its session ends), never while it continues
+working. Session presence/lifecycle is detected passively via OS
+process/window observation; fine-grained activity is sourced from Claude
+Code's own hook events via a one-time local setup step, ingested over a
+loopback-only HTTP listener the app hosts. Each agent identity's card
+position and the user's chosen background image persist across restarts.
+Built in C#/.NET with Avalonia UI, structured as four Clean Architecture
+layers (Domain/Application/Infrastructure/Presentation) with
+platform-specific and hook-ingestion interop isolated entirely in
+Infrastructure behind Domain-owned interfaces, developed test-first with
+unit, integration, and architecture test layers per the project
+constitution (Presentation-layer UI code, including this revision's
+desktop/card surface, remains the one deliberate exception per the
+constitution's Amendment History).
 
 ## Technical Context
 
 **Language/Version**: C# 12 / .NET 8 (LTS)
 
-**Primary Dependencies**: Avalonia UI 11.x (cross-platform UI + built-in `TrayIcon`); Windows toast notifications via the unpackaged-app toast API; macOS `UNUserNotificationCenter` via native interop; Win32 `user32.dll` P/Invoke (window enumeration/focus) on Windows; AppKit/Core Graphics interop on macOS; a minimal loopback-only HTTP listener (.NET's built-in `HttpListener`/Kestrel minimal APIs) for ingesting Claude Code hook payloads
+**Primary Dependencies**: Avalonia UI 12.x (cross-platform UI + built-in `TrayIcon`; `Canvas` + pointer events for the draggable card surface; `IStorageProvider` for the background-image file picker — no new package for either); Windows toast notifications via the unpackaged-app toast API; macOS `UNUserNotificationCenter` via native interop; Win32 `user32.dll` P/Invoke (window enumeration/focus) on Windows; `ntdll.dll`/`kernel32.dll` P/Invoke (`NtQueryInformationProcess` + `ReadProcessMemory` against a process's PEB, R15) for real working-directory resolution on Windows; AppKit/Core Graphics interop on macOS; a minimal loopback-only HTTP listener (.NET's built-in `HttpListener`/Kestrel minimal APIs) for ingesting Claude Code hook payloads
 
-**Storage**: No database. In-memory `AgentSession` list only (rebuilt on startup by re-scanning processes; activity state rebuilds from `Unknown` until the next hook signal); one user preference (launch-at-login) persisted in a local JSON settings file under the OS per-user app-data directory; hook command registration is written into the user's existing Claude Code configuration file, not a dashboard-owned store
+**Storage**: No database. In-memory `AgentSession` list only (rebuilt on startup by re-scanning processes; activity state rebuilds from `Unknown` until the next hook signal); user preferences — launch-at-login, per-agent-identity card positions, and the chosen background image path — persisted in the same local JSON settings file under the OS per-user app-data directory (`ISettingsStore`, already `JsonSettingsStore`-backed, extended rather than replaced); hook command registration is written into the user's existing Claude Code configuration file, not a dashboard-owned store
 
 **Testing**: xUnit; `NetArchTest.Rules` for architecture tests; `coverlet.collector` for coverage; `SonarAnalyzer.CSharp` static analysis with new-code warnings as errors
 
@@ -37,7 +43,7 @@ project constitution.
 
 **Project Type**: Desktop application (background tray/menu-bar app, single executable, embedding a local-only HTTP listener — no externally-reachable server component)
 
-**Performance Goals**: Agent list populated within 2s of tray click (SC-001); "Show" focuses the correct window within 1s (SC-002); attention notification (idle/waiting-for-input/ended) appears within 5s of that transition, with zero notifications while merely working (SC-003); activity detail view populated within 2s of clicking an entry (SC-007)
+**Performance Goals**: Agent card surface populated within 2s of tray click (SC-001); "Show" focuses the correct window within 1s (SC-002); attention notification (idle/waiting-for-input/ended) appears within 5s of that transition, with zero notifications while merely working (SC-003); activity detail overlay populated within 2s of clicking a card (SC-007); a dragged card's position and a chosen background image both survive a restart 100% of the time (SC-008/SC-009)
 
 **Constraints**: No elevated/admin privileges required for install or normal operation; session presence/lifecycle detection remains passive (process/window observation); fine-grained activity detection is the one deliberate exception, requiring a one-time local hook registration step rather than per-session configuration or agent control (spec Assumptions, FR-013); negligible idle resource footprint (SC-006)
 
@@ -98,7 +104,7 @@ src/
 │       ├── IWindowFocuser.cs
 │       ├── INotifier.cs
 │       ├── IHookRegistrar.cs
-│       └── ISettingsStore.cs
+│       └── ISettingsStore.cs   # extended, not replaced: gains card-position-by-agent-identity and background-image-path members alongside existing LaunchAtLoginEnabled
 │
 ├── ClaudeAgentDashboard.Application/
 │   └── UseCases/
@@ -129,8 +135,9 @@ src/
     ├── TrayIcon/
     │   └── TrayIconController.cs
     ├── Views/
-    │   ├── AgentListWindow.axaml (+ .cs)
-    │   └── AgentActivityDetailView.axaml (+ .cs)
+    │   ├── DesktopWindow.axaml (+ .cs)        # replaces AgentListWindow: the one main window — card canvas + overlay host + background image
+    │   ├── AgentCardView.axaml (+ .cs)        # one draggable card: icon, label, status badge; raises a "clicked" event to open the overlay
+    │   └── AgentDetailOverlay.axaml (+ .cs)   # replaces AgentActivityDetailView: in-window overlay (not a separate Window) — activity, status, Show/Dismiss actions
     ├── CompositionRoot.cs   # DI wiring: binds Domain ports to the OS-appropriate Infrastructure implementation
     └── Program.cs
 

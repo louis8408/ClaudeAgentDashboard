@@ -33,10 +33,13 @@ public sealed class AgentSessionRegistry
     public AgentSession? FindById(Guid id) => _sessions.TryGetValue(id, out var session) ? session : null;
 
     /// <summary>
-    /// Best-effort match of a hook signal's correlation key (cwd) against a still-running
-    /// session's label (research.md R10). Returns the most recently started match, or null
-    /// if none — callers must tolerate a miss rather than treat it as an error, since a
-    /// signal can legitimately arrive before its session has been detected yet.
+    /// Matches a hook signal's correlation key (cwd) against a still-running session
+    /// (research.md R10/R15). Prefers the session's actual resolved <see cref="AgentSession.WorkingDirectory"/>
+    /// when known (FR-018) — authoritative once available, since it's the real cwd rather than a
+    /// guess — and falls back to the weaker command-line-derived <see cref="AgentSession.Label"/>
+    /// substring match only for sessions whose working directory couldn't be resolved. Returns the
+    /// most recently started match, or null if none — callers must tolerate a miss rather than treat
+    /// it as an error, since a signal can legitimately arrive before its session has been detected yet.
     /// </summary>
     public AgentSession? FindByCorrelationKey(string correlationKey)
     {
@@ -45,13 +48,26 @@ public sealed class AgentSessionRegistry
             return null;
         }
 
-        return _sessions.Values
-            .Where(s => s.SessionState == SessionState.Running)
-            .Where(s => s.Label.Contains(correlationKey, StringComparison.OrdinalIgnoreCase)
-                || correlationKey.Contains(s.Label, StringComparison.OrdinalIgnoreCase))
+        var running = _sessions.Values.Where(s => s.SessionState == SessionState.Running);
+
+        var byWorkingDirectory = running
+            .Where(s => s.WorkingDirectory is not null && Overlaps(s.WorkingDirectory, correlationKey))
+            .OrderByDescending(s => s.StartedAt)
+            .FirstOrDefault();
+
+        if (byWorkingDirectory is not null)
+        {
+            return byWorkingDirectory;
+        }
+
+        return running
+            .Where(s => s.WorkingDirectory is null && Overlaps(s.Label, correlationKey))
             .OrderByDescending(s => s.StartedAt)
             .FirstOrDefault();
     }
+
+    private static bool Overlaps(string a, string b) =>
+        a.Contains(b, StringComparison.OrdinalIgnoreCase) || b.Contains(a, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Removes an Ended session from the active list (FR-012); a no-op for a Running one.</summary>
     public void Dismiss(Guid id)

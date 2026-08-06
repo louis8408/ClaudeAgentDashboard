@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ClaudeAgentDashboard.Domain;
 using ClaudeAgentDashboard.Domain.Ports;
 
 namespace ClaudeAgentDashboard.Infrastructure.Settings;
@@ -39,6 +40,26 @@ public sealed class JsonSettingsStore : ISettingsStore
         }
     }
 
+    public string? BackgroundImagePath
+    {
+        get => _data.BackgroundImagePath;
+        set
+        {
+            _data = _data with { BackgroundImagePath = value };
+            Save();
+        }
+    }
+
+    public CardPosition? GetCardPosition(string agentLabel) =>
+        _data.CardPositions.TryGetValue(agentLabel, out var position) ? position : null;
+
+    public void SetCardPosition(string agentLabel, CardPosition position)
+    {
+        var updated = new Dictionary<string, CardPosition>(_data.CardPositions) { [agentLabel] = position };
+        _data = _data with { CardPositions = updated };
+        Save();
+    }
+
     private static string DefaultFilePath() => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "ClaudeAgentDashboard",
@@ -48,22 +69,22 @@ public sealed class JsonSettingsStore : ISettingsStore
     {
         if (!File.Exists(filePath))
         {
-            return new SettingsData(false);
+            return SettingsData.Empty;
         }
 
         var text = File.ReadAllText(filePath);
         if (string.IsNullOrWhiteSpace(text))
         {
-            return new SettingsData(false);
+            return SettingsData.Empty;
         }
 
         try
         {
-            return JsonSerializer.Deserialize<SettingsData>(text) ?? new SettingsData(false);
+            return JsonSerializer.Deserialize<SettingsData>(text) ?? SettingsData.Empty;
         }
         catch (JsonException)
         {
-            return new SettingsData(false);
+            return SettingsData.Empty;
         }
     }
 
@@ -78,5 +99,11 @@ public sealed class JsonSettingsStore : ISettingsStore
         File.WriteAllText(_filePath, JsonSerializer.Serialize(_data));
     }
 
-    private sealed record SettingsData(bool LaunchAtLoginEnabled);
+    private sealed record SettingsData(
+        bool LaunchAtLoginEnabled,
+        string? BackgroundImagePath,
+        Dictionary<string, CardPosition> CardPositions)
+    {
+        public static SettingsData Empty => new(false, null, []);
+    }
 }

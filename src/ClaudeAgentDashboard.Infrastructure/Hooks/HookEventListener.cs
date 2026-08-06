@@ -113,7 +113,8 @@ public sealed class HookEventListener : IAgentActivityFeed, IDisposable
                 return;
             }
 
-            var signal = new ActivitySignal(payload.Cwd, hookEvent, DateTimeOffset.UtcNow, DeriveSummary(hookEvent, payload));
+            var signal = new ActivitySignal(
+                payload.Cwd, hookEvent, DateTimeOffset.UtcNow, DeriveSummary(hookEvent, payload), payload.TranscriptPath);
             SignalReceived?.Invoke(signal);
 
             await RespondAsync(context, HttpStatusCode.OK).ConfigureAwait(false);
@@ -183,5 +184,8 @@ public sealed class HookEventListener : IAgentActivityFeed, IDisposable
 
         [JsonPropertyName("message")]
         public string? Message { get; set; }
+
+        [JsonPropertyName("transcript_path")]
+        public string? TranscriptPath { get; set; }
     }
 }

@@ -46,7 +46,14 @@ public sealed class MacProcessAgentWatcher : IAgentWatcher, IDisposable
                 continue;
             }
 
-            var session = new AgentSession(Guid.NewGuid(), label, DateTimeOffset.UtcNow, new TerminalWindowReference(processId));
+            // Best-effort real working directory (R15/FR-018), same rationale as the Windows
+            // PEB-based resolver: `ps`'s command-line field never contains it for a bare
+            // `claude` invocation. Unverified on real macOS hardware in this session, like the
+            // rest of this file — degrades to null (existing label-based fallback) on any
+            // failure, never throws.
+            var workingDirectory = ResolveWorkingDirectory(processId);
+            var session = new AgentSession(
+                Guid.NewGuid(), label, DateTimeOffset.UtcNow, new TerminalWindowReference(processId), workingDirectory);
 
             if (_sessions.TryAdd(processId, session) && raiseEvents)
             {
@@ -132,6 +139,38 @@ public sealed class MacProcessAgentWatcher : IAgentWatcher, IDisposable
 
     private static string DeriveLabel(string commandLine) =>
         commandLine.Length <= 80 ? commandLine : commandLine[..80];
+
+    private static string? ResolveWorkingDirectory(int processId)
+    {
+        try
+        {
+            using var lsof = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "/usr/sbin/lsof",
+                    ArgumentList = { "-a", "-d", "cwd", "-p", processId.ToString(System.Globalization.CultureInfo.InvariantCulture), "-Fn" },
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                },
+            };
+
+            lsof.Start();
+            var output = lsof.StandardOutput.ReadToEnd();
+            lsof.WaitForExit();
+
+            // `-Fn` output has one field per line; the cwd's path line is prefixed with 'n'.
+            var pathLine = Array.Find(
+                output.Split('\n', StringSplitOptions.RemoveEmptyEntries), line => line.StartsWith('n'));
+
+            return pathLine is { Length: > 1 } ? pathLine[1..] : null;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            return null;
+        }
+    }
 
     public void Dispose() => _timer.Dispose();
 }

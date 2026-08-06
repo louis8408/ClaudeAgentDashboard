@@ -31,10 +31,13 @@ or Application code — they only ever see the resulting `ActivitySignal`
 
 - The listener parses whatever fields Claude Code's hook payload provides
   for that event (at minimum: a working-directory field and, once
-  available, a session identifier — see research.md R10 for how these are
-  used to correlate to an `AgentSession`). It extracts an event-specific
+  available, a session identifier — see research.md R10/R15 for how these
+  are used to correlate to an `AgentSession`). It extracts an event-specific
   summary where present (e.g., tool name for `PreToolUse`, message text for
-  `Notification`) into `ActivitySignal.SummaryText`.
+  `Notification`) into `ActivitySignal.SummaryText`, and a `transcript_path`
+  field where present into `ActivitySignal.TranscriptPath` (R16, FR-019) —
+  purely passed through for display, never parsed or acted on by the
+  listener itself.
 - A request the listener cannot parse (unexpected shape, missing
   correlation fields) is logged and dropped with a `4xx` response — it MUST
   NOT crash the listener or the application (per `IAgentActivityFeed`'s

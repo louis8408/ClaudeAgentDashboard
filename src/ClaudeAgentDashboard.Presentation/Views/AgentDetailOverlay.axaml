@@ -1,0 +1,65 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="ClaudeAgentDashboard.Presentation.Views.AgentDetailOverlay">
+  <Border Name="OverlayChrome"
+          CornerRadius="16" Padding="20" Width="420" MaxHeight="520"
+          HorizontalAlignment="Center" VerticalAlignment="Center"
+          BorderThickness="1" BorderBrush="#33FFFFFF"
+          BoxShadow="0 16 40 -10 #AA000000">
+    <Border.Background>
+      <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+        <GradientStop Color="#E6202024" Offset="0" />
+        <GradientStop Color="#F01A1A1E" Offset="1" />
+      </LinearGradientBrush>
+    </Border.Background>
+    <DockPanel>
+      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto">
+        <TextBlock Name="AgentLabelText" Grid.Column="0" FontWeight="SemiBold" FontSize="15"
+                   Foreground="White" TextWrapping="Wrap" />
+        <Button Grid.Column="1" Content="✕" Click="OnCloseClicked"
+                Background="Transparent" BorderThickness="0" Foreground="#AAFFFFFF"
+                CornerRadius="6" Padding="6,2" />
+      </Grid>
+      <TextBlock Name="MessageBanner" DockPanel.Dock="Bottom" Foreground="#FFC46B"
+                 TextWrapping="Wrap" IsVisible="False" Margin="0,10,0,0" FontSize="12.5" />
+      <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,16,0,0">
+        <Button Name="ShowButton" Content="Show" Click="OnShowClicked"
+                Background="#3D7CFF" Foreground="White" CornerRadius="8" Padding="16,7" />
+        <Button Name="DismissButton" Content="Dismiss" Click="OnDismissClicked" IsVisible="False"
+                Background="#26FFFFFF" Foreground="#DDFFFFFF" CornerRadius="8" Padding="16,7" />
+      </StackPanel>
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="10" Margin="0,16,0,0">
+          <Border Name="ActivityBadge" HorizontalAlignment="Left" CornerRadius="8" Padding="9,3">
+            <TextBlock Name="ActivityStateText" FontSize="12" FontWeight="Medium" />
+          </Border>
+          <TextBlock Name="ActivitySummaryText" Foreground="#CCFFFFFF" TextWrapping="Wrap" FontSize="13" />
+          <Border Name="HookSetupPanel" IsVisible="False" Background="#14FFFFFF" CornerRadius="8"
+                  Padding="12" Margin="0,4,0,0">
+            <StackPanel Spacing="8">
+              <TextBlock Name="HookSetupExplanationText" Foreground="#BBFFFFFF" TextWrapping="Wrap"
+                         FontSize="12" />
+              <Button Name="SetUpHooksButton" Content="Set up activity detection…"
+                      Click="OnSetUpHooksClicked" HorizontalAlignment="Left"
+                      Background="#26FFFFFF" Foreground="White" CornerRadius="7" Padding="12,6"
+                      FontSize="12.5" />
+            </StackPanel>
+          </Border>
+          <StackPanel Name="TranscriptSection" IsVisible="False" Spacing="6" Margin="0,4,0,0">
+            <TextBlock Text="Recent transcript" Foreground="#99FFFFFF" FontSize="11"
+                       FontWeight="Medium" />
+            <ItemsControl Name="TranscriptItems">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <Border Background="#14FFFFFF" CornerRadius="6" Padding="8,6" Margin="0,0,0,4">
+                    <TextBlock Text="{Binding}" Foreground="#DDFFFFFF" TextWrapping="Wrap" FontSize="12" />
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+    </DockPanel>
+  </Border>
+</UserControl>

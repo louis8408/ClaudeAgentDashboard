@@ -95,6 +95,50 @@ public class AgentSessionTests
     }
 
     [Fact]
+    public void Constructor_Accepts_Optional_WorkingDirectory()
+    {
+        var session = new AgentSession(
+            Guid.NewGuid(), "my-agent", DateTimeOffset.UtcNow, new TerminalWindowReference(1234),
+            workingDirectory: @"C:\work\agent");
+
+        Assert.Equal(@"C:\work\agent", session.WorkingDirectory);
+    }
+
+    [Fact]
+    public void Constructor_Leaves_WorkingDirectory_Null_When_Not_Provided()
+    {
+        var session = CreateSession();
+
+        Assert.Null(session.WorkingDirectory);
+    }
+
+    [Fact]
+    public void ApplySignal_Sets_TranscriptPath_When_Signal_Carries_One()
+    {
+        var session = CreateSession();
+        var signal = new ActivitySignal(
+            "cwd", HookEvent.PreToolUse, DateTimeOffset.UtcNow, "doing something",
+            transcriptPath: @"C:\transcripts\a.jsonl");
+
+        session.ApplySignal(signal);
+
+        Assert.Equal(@"C:\transcripts\a.jsonl", session.TranscriptPath);
+    }
+
+    [Fact]
+    public void ApplySignal_Keeps_Existing_TranscriptPath_When_Later_Signal_Omits_It()
+    {
+        var session = CreateSession();
+        session.ApplySignal(new ActivitySignal(
+            "cwd", HookEvent.PreToolUse, DateTimeOffset.UtcNow, transcriptPath: @"C:\transcripts\a.jsonl"));
+
+        session.ApplySignal(new ActivitySignal(
+            "cwd", HookEvent.Stop, DateTimeOffset.UtcNow.AddSeconds(1)));
+
+        Assert.Equal(@"C:\transcripts\a.jsonl", session.TranscriptPath);
+    }
+
+    [Fact]
     public void ApplySignal_Is_NoOp_Once_Session_Has_Ended()
     {
         var session = CreateSession();

@@ -5,6 +5,7 @@ using ClaudeAgentDashboard.Domain.Ports;
 using ClaudeAgentDashboard.Infrastructure.Hooks;
 using ClaudeAgentDashboard.Infrastructure.MacOS;
 using ClaudeAgentDashboard.Infrastructure.Settings;
+using ClaudeAgentDashboard.Infrastructure.Transcripts;
 using ClaudeAgentDashboard.Infrastructure.Windows;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -49,6 +50,8 @@ public static class CompositionRoot
         services.AddSingleton<HandleNotificationActivatedCommand>();
         services.AddSingleton<DismissAgentCommand>();
         services.AddSingleton<ViewAgentActivityQuery>();
+        services.AddSingleton<ITranscriptReader, JsonlTranscriptReader>();
+        services.AddSingleton<ViewAgentTranscriptQuery>();
         services.AddSingleton<ISettingsStore, JsonSettingsStore>();
 
         var provider = services.BuildServiceProvider();

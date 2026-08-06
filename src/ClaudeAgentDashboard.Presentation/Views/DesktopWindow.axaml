@@ -1,0 +1,58 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ClaudeAgentDashboard.Presentation.Views.DesktopWindow"
+        Title="Claude Agent Dashboard"
+        Width="760" Height="540">
+  <Window.Styles>
+    <Style Selector="Button.glass">
+      <Setter Property="Background" Value="#26FFFFFF" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="#26FFFFFF" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="14,7" />
+      <Setter Property="FontSize" Value="12.5" />
+    </Style>
+    <Style Selector="Button.glass:pointerover">
+      <Setter Property="Background" Value="#3AFFFFFF" />
+    </Style>
+  </Window.Styles>
+
+  <Grid>
+    <Border Name="DefaultBackground">
+      <Border.Background>
+        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+          <GradientStop Color="#FF14161B" Offset="0" />
+          <GradientStop Color="#FF1E2029" Offset="0.55" />
+          <GradientStop Color="#FF16181E" Offset="1" />
+        </LinearGradientBrush>
+      </Border.Background>
+    </Border>
+    <Image Name="BackgroundImage" Stretch="UniformToFill" IsVisible="False" />
+
+    <Grid RowDefinitions="Auto,*">
+      <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="14" HorizontalAlignment="Right">
+        <Button Name="ChooseBackgroundButton" Content="🖼  Choose background…" Classes="glass"
+                Click="OnChooseBackgroundClicked" />
+      </StackPanel>
+
+      <Grid Grid.Row="1">
+        <StackPanel Name="EmptyStatePanel" Spacing="6"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="False">
+          <TextBlock Text="No Claude Code agents detected"
+                     Foreground="#CCFFFFFF" FontSize="15" FontWeight="Medium"
+                     HorizontalAlignment="Center" />
+          <TextBlock Text="Start a Claude Code CLI session and it will appear here."
+                     Foreground="#77FFFFFF" FontSize="12.5" HorizontalAlignment="Center" />
+        </StackPanel>
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+          <Canvas Name="CardCanvas" Width="2400" Height="1600" Background="Transparent" />
+        </ScrollViewer>
+      </Grid>
+    </Grid>
+
+    <Border Name="OverlayScrim" Background="#99000000" IsVisible="False">
+      <ContentControl Name="OverlayHost" />
+    </Border>
+  </Grid>
+</Window>

@@ -113,13 +113,29 @@ on for `IAgentActivityFeed` signals (FR-013's one-time setup step).
 ## ISettingsStore
 
 Persists the small set of user preferences identified in the spec
-(launch-at-login, and whether hook registration has been offered/declined).
+(launch-at-login; each known agent identity's desktop card position; the
+chosen desktop background image — R14).
 
 - `bool LaunchAtLoginEnabled { get; set; }`
+- `CardPosition? GetCardPosition(string agentLabel)` — null if this label
+  has no saved position yet (caller applies a default, non-overlapping
+  placement per FR-016).
+- `void SetCardPosition(string agentLabel, CardPosition position)` —
+  called on drag-release only (data-model.md validation rule), not on
+  every pointer-move.
+- `string? BackgroundImagePath { get; set; }` — null means "use the
+  default background."
 
 **Contract**:
 - Reads/writes MUST be safe to call from the UI thread without blocking
   perceptibly (local file only, no network).
+- `SetCardPosition` MUST persist immediately (same durability guarantee as
+  `LaunchAtLoginEnabled`'s existing setter) — a card dragged just before
+  the app is closed MUST NOT lose its new position.
+- `GetCardPosition`/`BackgroundImagePath` MUST NOT throw for a label never
+  seen before or a path that no longer resolves to a file — both are
+  expected, non-error conditions the caller handles by falling back to a
+  default (FR-016, R13).
 
 ---
 

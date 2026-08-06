@@ -10,8 +10,11 @@ public sealed class ActivitySignal
     public HookEvent HookEvent { get; }
     public DateTimeOffset OccurredAt { get; }
     public string? SummaryText { get; }
+    public string? TranscriptPath { get; }
 
-    public ActivitySignal(string correlationKey, HookEvent hookEvent, DateTimeOffset occurredAt, string? summaryText = null)
+    public ActivitySignal(
+        string correlationKey, HookEvent hookEvent, DateTimeOffset occurredAt,
+        string? summaryText = null, string? transcriptPath = null)
     {
         if (string.IsNullOrWhiteSpace(correlationKey))
         {
@@ -22,5 +25,6 @@ public sealed class ActivitySignal
         HookEvent = hookEvent;
         OccurredAt = occurredAt;
         SummaryText = summaryText;
+        TranscriptPath = transcriptPath;
     }
 }

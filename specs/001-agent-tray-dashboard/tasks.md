@@ -21,12 +21,12 @@ oversight; don't add unit tests for these tasks expecting them to satisfy Princi
 
 **Organization**: Tasks are grouped by user story (from spec.md) to enable independent implementation and
 testing of each story: Setup → Foundational → User Story 1 → User Story 2 → User Story 3 → User Story 4 →
-Polish.
+User Story 5 → Polish.
 
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies)
-- **[Story]**: Which user story this task belongs to (US1, US2, US3, US4)
+- **[Story]**: Which user story this task belongs to (US1, US2, US3, US4, US5)
 - Every task includes an exact file path
 
 ## Path Conventions
@@ -380,7 +380,172 @@ per plan.md; the view itself is a separate, independently-addable slice.)
 
 ---
 
-## Phase 7: Polish & Cross-Cutting Concerns
+## Phase 7: User Story 5 - Arrange and personalize the desktop (Priority: P3)
+
+**Goal**: Replace the plain agent list and separate detail window with a single desktop-style window: agent
+cards freely draggable anywhere on the surface, a card click opens an in-window detail overlay (activity,
+status, Show/Dismiss actions) that returns to the card view on close, and a user-selectable background
+image — both card positions and the background persisting across restarts.
+
+**Independent Test**: With two or more agents running, drag their cards to specific positions, set a custom
+background image, restart the application, and confirm both the card positions and the background are
+exactly as left — see quickstart.md scenario 5. (Depends on User Stories 1–4's underlying use cases —
+`OpenDashboardQuery`, `ShowAgentCommand`, `DismissAgentCommand`, `ViewAgentActivityQuery` — already existing;
+this phase changes how they're presented, not what they do.)
+
+### Tests for User Story 5
+
+> Write these tests FIRST, confirm they FAIL, then implement.
+
+- [X] T079 [P] [US5] Write failing integration test: `JsonSettingsStore` round-trips a card position for a
+      given agent label against a real temp file (`SetCardPosition` then `GetCardPosition` returns it back),
+      and returns null for a label never set, in
+      `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/JsonSettingsStoreTests.cs`
+- [X] T080 [P] [US5] Write failing integration test: `JsonSettingsStore` round-trips `BackgroundImagePath`
+      against a real temp file and defaults to null when never set, in
+      `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/JsonSettingsStoreTests.cs`
+
+### Implementation for User Story 5
+
+- [X] T081 [US5] Add the `CardPosition` value type (`double X, double Y` per data-model.md) in
+      `src/ClaudeAgentDashboard.Domain/CardPosition.cs`, and extend the `ISettingsStore` port with
+      `GetCardPosition(string agentLabel)`, `SetCardPosition(string agentLabel, CardPosition position)`, and
+      `string? BackgroundImagePath { get; set; }` per contracts/domain-ports.md, in
+      `src/ClaudeAgentDashboard.Domain/Ports/ISettingsStore.cs`
+- [X] T082 [US5] Extend `JsonSettingsStore` to persist `CardPositions`/`BackgroundImagePath` in the same
+      settings file as `LaunchAtLoginEnabled`, making T079/T080 pass, in
+      `src/ClaudeAgentDashboard.Infrastructure/Settings/JsonSettingsStore.cs` (depends on T081)
+- [X] T083 [US5] Implement `DesktopWindow` — a `Canvas`-based card surface bound to `OpenDashboardQuery`,
+      replacing `AgentListWindow` (one `AgentCardView` per session positioned via `Canvas.Left`/`Canvas.Top`;
+      an agent identity with no saved `CardPosition` gets a default, non-overlapping slot per FR-016) — in
+      `src/ClaudeAgentDashboard.Presentation/Views/DesktopWindow.axaml` and `.axaml.cs` (depends on T036,
+      T082) — Presentation task, no preceding test per constitution v1.1.0
+- [X] T084 [US5] Implement `AgentCardView` (icon, label, status badge; `PointerPressed`/`PointerMoved`/
+      `PointerReleased`-based dragging per research.md R12, calling `ISettingsStore.SetCardPosition` only on
+      release; raises a "clicked" event distinct from dragging) in
+      `src/ClaudeAgentDashboard.Presentation/Views/AgentCardView.axaml` and `.axaml.cs` (depends on T081) —
+      Presentation task, no preceding test per constitution v1.1.0
+- [X] T085 [US5] Implement `AgentDetailOverlay` — an in-window overlay (not a `Window`), replacing
+      `AgentActivityDetailView`, showing `ViewAgentActivityQuery`'s live activity summary plus a "Show"
+      action wired to `ShowAgentCommand` and a "Dismiss" action wired to `DismissAgentCommand` (enabled only
+      once `SessionState = Ended`, per FR-014) — in
+      `src/ClaudeAgentDashboard.Presentation/Views/AgentDetailOverlay.axaml` and `.axaml.cs` (depends on
+      T044, T064, T069) — Presentation task, no preceding test per constitution v1.1.0
+- [X] T086 [US5] Wire `DesktopWindow`: a card click opens `AgentDetailOverlay` over the canvas; closing the
+      overlay returns to the card view in the same window; the tray icon click (`TrayIconController`) opens
+      `DesktopWindow` in place of `AgentListWindow`; remove the now-superseded
+      `AgentListWindow.axaml`/`.axaml.cs` and `AgentActivityDetailView.axaml`/`.axaml.cs` — in
+      `src/ClaudeAgentDashboard.Presentation/Views/DesktopWindow.axaml.cs` and
+      `src/ClaudeAgentDashboard.Presentation/TrayIcon/TrayIconController.cs` (depends on T083, T084, T085;
+      supersedes the wiring T038/T045/T065/T071 did against `AgentListWindow`) — Presentation task, no
+      preceding test per constitution v1.1.0
+- [X] T087 [US5] Implement background image customization: a menu/button action invoking Avalonia's
+      `TopLevel.StorageProvider.OpenFilePickerAsync` (R13), persisting the chosen path via
+      `ISettingsStore.BackgroundImagePath`, rendering it stretched behind the card canvas, and falling back
+      to the default background if the stored path no longer resolves to a readable file — in
+      `src/ClaudeAgentDashboard.Presentation/Views/DesktopWindow.axaml` and `.axaml.cs` (depends on T082,
+      T083) — Presentation task, no preceding test per constitution v1.1.0
+
+**Checkpoint**: All five user stories are independently functional; the dashboard is now the single
+`DesktopWindow` for every prior story's UI needs.
+
+---
+
+## Phase 8: Fix activity detection correlation & add transcript display (FR-018, FR-019)
+
+**Purpose**: Fix a real, empirically-proven defect found while dogfooding — hook-to-session correlation
+silently never succeeds for the ordinary case of a session started with the plain `claude` command on
+Windows (see quickstart.md's Validation Log for the diagnostic proof) — and add a read-only transcript
+view to the detail overlay, using a hook payload field already available but previously ignored. Unlike
+Phase 7, this phase includes real Infrastructure-layer changes, so it follows test-first per the
+constitution.
+
+### Tests for Phase 8
+
+> Write these tests FIRST, confirm they FAIL, then implement.
+
+- [X] T091 [P] Write failing unit test: `AgentSession` accepts an optional `WorkingDirectory` at
+      construction, and `ApplySignal` sets `TranscriptPath` from the incoming `ActivitySignal` alongside
+      the existing `ActivityState`/`ActivitySummary` updates, in
+      `tests/ClaudeAgentDashboard.Domain.UnitTests/AgentSessionTests.cs`
+- [X] T092 [P] Write failing unit test: `AgentSessionRegistry.FindByCorrelationKey` matches primarily
+      against a session's `WorkingDirectory` when set, and only falls back to the existing `Label`-substring
+      match when `WorkingDirectory` is null or doesn't match, in
+      `tests/ClaudeAgentDashboard.Application.UnitTests/AgentSessionRegistryTests.cs`
+- [X] T093 [P] Write failing integration test: spawn a real process via `ProcessStartInfo` with a known
+      `WorkingDirectory`, and assert the Windows working-directory resolver (PEB reading, R15) returns that
+      same path, in
+      `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/WindowsWorkingDirectoryResolverTests.cs`
+      (Windows-only)
+- [X] T094 [P] Write failing integration test: `HookEventListener` parses a `transcript_path` field from a
+      payload into `ActivitySignal.TranscriptPath`, and continues to work correctly (per existing tests)
+      when that field is absent, in
+      `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/HookEventListenerTests.cs`
+- [X] T095 [P] Write failing integration test: `JsonlTranscriptReader` reads the last N entries from a real
+      temp JSONL file into human-readable strings, in
+      `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/JsonlTranscriptReaderTests.cs`
+- [X] T096 [P] Write failing unit test: `ViewAgentTranscriptQuery` returns recent transcript entries for a
+      session with a known `TranscriptPath` using a faked `ITranscriptReader`, and returns an empty result
+      (not an error) when `TranscriptPath` is null, in
+      `tests/ClaudeAgentDashboard.Application.UnitTests/ViewAgentTranscriptQueryTests.cs`
+
+### Implementation for Phase 8
+
+- [X] T097 Extend `AgentSession` with `WorkingDirectory` (constructor parameter) and `TranscriptPath`
+      (set via `ApplySignal`), making T091 pass, in `src/ClaudeAgentDashboard.Domain/AgentSession.cs`
+- [X] T098 [P] Extend `ActivitySignal` with `TranscriptPath`, in
+      `src/ClaudeAgentDashboard.Domain/ActivitySignal.cs` (depends on T097 for the matching AgentSession
+      field it feeds)
+- [X] T099 Update `AgentSessionRegistry.FindByCorrelationKey` to check `WorkingDirectory` first, making
+      T092 pass, in `src/ClaudeAgentDashboard.Application/AgentSessionRegistry.cs`
+- [X] T100 Implement Windows working-directory resolution (PEB reading via `NtQueryInformationProcess` +
+      `ReadProcessMemory`, R15) as a small internal helper, making T093 pass, and wire
+      `WindowsProcessAgentWatcher` to populate `AgentSession.WorkingDirectory` at construction — any
+      resolution failure (unsupported OS/architecture, access denied) MUST leave it null rather than throw
+      (spec edge case), in `src/ClaudeAgentDashboard.Infrastructure/Windows/WindowsProcessAgentWatcher.cs`
+      (depends on T097)
+- [X] T101 [P] Best-effort macOS equivalent: resolve each tracked process's cwd via `lsof -a -d cwd -p
+      <pid>` in `MacProcessAgentWatcher`, same null-on-failure contract as T100 — implemented and
+      skip-guarded like the rest of the macOS code, but unverified on real hardware in this session (depends
+      on T097)
+- [X] T102 Extend `HookEventListener`'s payload parsing to capture `transcript_path` into
+      `ActivitySignal.TranscriptPath`, making T094 pass, in
+      `src/ClaudeAgentDashboard.Infrastructure/Hooks/HookEventListener.cs` (depends on T098)
+- [X] T103 [P] Define the `ITranscriptReader` port (`ReadRecentEntries(string transcriptPath, int
+      maxEntries)`) in `src/ClaudeAgentDashboard.Domain/Ports/ITranscriptReader.cs`
+- [X] T104 Implement `JsonlTranscriptReader`, making T095 pass, in
+      `src/ClaudeAgentDashboard.Infrastructure/Transcripts/JsonlTranscriptReader.cs` (depends on T103) —
+      no OS-specific interop needed (plain file I/O), one shared implementation for both platforms
+- [X] T105 Implement `ViewAgentTranscriptQuery` in
+      `src/ClaudeAgentDashboard.Application/UseCases/ViewAgentTranscriptQuery.cs`, making T096 pass
+      (depends on T103)
+- [X] T106 Update `AgentDetailOverlay` to show recent transcript entries via `ViewAgentTranscriptQuery`,
+      refreshing on the existing 1-second timer, in
+      `src/ClaudeAgentDashboard.Presentation/Views/AgentDetailOverlay.axaml`/`.axaml.cs` (depends on T105)
+      — Presentation task, no preceding test per constitution v1.1.0
+- [X] T107 Register `ITranscriptReader`/`JsonlTranscriptReader` and `ViewAgentTranscriptQuery` in
+      `CompositionRoot`, and thread the query through `DesktopWindow` into `AgentDetailOverlay`
+      construction, in `src/ClaudeAgentDashboard.Presentation/CompositionRoot.cs` and
+      `src/ClaudeAgentDashboard.Presentation/Views/DesktopWindow.axaml.cs` (depends on T104, T105, T106)
+      — Presentation task, no preceding test per constitution v1.1.0
+- [X] T108 Correct `AgentDetailOverlay`'s hook-setup guidance text: the "hooks already registered" branch
+      previously told the user to "restart this session," which does not fix a correlation mismatch —
+      replace with accurate wording now that T097–T101 are the actual fix; the "not yet registered → Set
+      up" branch was already correct and is unchanged, in
+      `src/ClaudeAgentDashboard.Presentation/Views/AgentDetailOverlay.axaml.cs` (depends on T099–T101) —
+      Presentation task, no preceding test per constitution v1.1.0
+- [X] T109 [P] Re-run quickstart.md scenario 6 end-to-end on Windows and record results in
+      `specs/001-agent-tray-dashboard/quickstart.md` (depends on T091–T108)
+- [X] T110 [P] Update `README.md`'s "Known gaps" — the hook-to-session correlation bullet no longer
+      applies on Windows now that T100 is in place; note macOS's T101 equivalent remains unverified on
+      real hardware
+
+**Checkpoint**: Activity detection works correctly for the ordinary case on Windows; the detail overlay
+shows read-only transcript content.
+
+---
+
+## Phase 9: Polish & Cross-Cutting Concerns
 
 **Purpose**: Improvements that support the feature as a whole without belonging to a single user story.
 
@@ -402,6 +567,14 @@ per plan.md; the view itself is a separate, independently-addable slice.)
 - [X] T077 [P] Review the SonarCloud/coverage report from CI and address any new-code issues surfaced
 - [X] T078 [P] Update `README.md` with build, run, hook-setup, and architecture overview instructions
       referencing plan.md
+- [X] T089 [P] Re-run quickstart.md validation end-to-end on Windows covering **scenario 5 specifically**
+      (card drag persistence, background image persistence) plus a spot-check that scenarios 1–4 still pass
+      against the new `DesktopWindow`/`AgentDetailOverlay` UI, and record results in
+      `specs/001-agent-tray-dashboard/quickstart.md` (depends on T079–T087)
+- [ ] T090 [P] Re-run quickstart.md validation end-to-end on macOS covering **scenario 5 specifically** (card
+      drag persistence, background image persistence) plus a spot-check that scenarios 1–4 still pass against
+      the new `DesktopWindow`/`AgentDetailOverlay` UI, and record results in
+      `specs/001-agent-tray-dashboard/quickstart.md` (depends on T079–T087)
 
 ---
 
@@ -419,13 +592,20 @@ per plan.md; the view itself is a separate, independently-addable slice.)
   its own acceptance scenarios, but naturally sequenced after US1/US2.
 - **User Story 4 (T068–T071)**: Depends on Foundational directly, and in practice on User Story 3's hook
   pipeline (T058–T067) to have any `ActivitySummary` content to display — sequenced last among the stories.
-- **Polish (T072–T078)**: Depends on the desired user stories being complete.
+- **User Story 5 (T079–T087)**: Depends on Foundational directly for the `ISettingsStore` extension
+  (T081/T082), and on User Stories 1–4's use cases (`OpenDashboardQuery` T036, `ShowAgentCommand` T044,
+  `DismissAgentCommand` T064, `ViewAgentActivityQuery` T069) for what `DesktopWindow`/`AgentDetailOverlay`
+  present — it replaces those stories' UI (`AgentListWindow`/`AgentActivityDetailView`), not their
+  Application-layer logic, so it is sequenced last.
+- **Polish (T072–T078, T089–T090)**: Depends on the desired user stories being complete; T089/T090
+  specifically depend on User Story 5 (T079–T087) since they validate its new scenario.
 
 ### Within Each User Story
 
 - Tests are written and confirmed failing before implementation for Domain/Application/Infrastructure
   tasks (constitution Principle II, v1.1.0); Presentation tasks are explicitly exempted (see the Tests
-  note at the top of this file) and validated via T075/T076 instead.
+  note at the top of this file) and validated via T075/T076 (and, for User Story 5's new scenario,
+  T089/T090) instead.
 - Domain/Application layers before Infrastructure before Presentation wiring.
 - Story checkpoint reached before moving to the next priority.
 
@@ -440,6 +620,9 @@ per plan.md; the view itself is a separate, independently-addable slice.)
   implementation begins.
 - Different user stories can be staffed in parallel once Foundational is complete, keeping in mind the
   shared-file sequencing notes on `AgentListWindow`/`TrayIconController` above.
+- Within User Story 5, T079 ∥ T080 (same test file, but independent test methods, still writable in
+  parallel by different contributors); T084 and T085 are different files and can proceed in parallel once
+  T081 lands; T083 depends on T082, and T086/T087 depend on T083–T085 being in place.
 
 ---
 
@@ -479,7 +662,10 @@ Task: "Implement MacUserNotifier in src/ClaudeAgentDashboard.Infrastructure/MacO
 4. User Story 3 → validate → demo (the full "notify me only when it needs me" loop, plus dismissing ended
    agents — the heart of this revision).
 5. User Story 4 → validate → demo (per-agent activity detail view).
-6. Polish → login-item registration, cross-platform validation sign-off (including SC-006), README.
+6. User Story 5 → validate → demo (the customizable card-desktop UI, replacing the plain list and separate
+   detail window from User Stories 1 and 4).
+7. Polish → login-item registration, cross-platform validation sign-off (including SC-006 and, for this
+   revision, the new card/background persistence scenario), README.
 
 ---
 

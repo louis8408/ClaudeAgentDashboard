@@ -66,6 +66,46 @@ public class HookEventListenerTests
     }
 
     [Fact]
+    public async Task Listener_Parses_TranscriptPath_When_Present()
+    {
+        using var listener = new HookEventListener(preferredPort: 51930);
+        var received = new TaskCompletionSource<ActivitySignal>();
+        listener.SignalReceived += signal => received.TrySetResult(signal);
+
+        var payload = """{"cwd":"C:\\work\\my-project","transcript_path":"C:\\transcripts\\abc123.jsonl"}""";
+        var response = await Client.PostAsync(
+            new Uri(listener.BaseAddress, "hooks/pre-tool-use"),
+            new StringContent(payload, Encoding.UTF8, "application/json"));
+
+        Assert.True(response.IsSuccessStatusCode);
+        var completed = await Task.WhenAny(received.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        Assert.Same(received.Task, completed);
+
+        var signal = await received.Task;
+        Assert.Equal("C:\\transcripts\\abc123.jsonl", signal.TranscriptPath);
+    }
+
+    [Fact]
+    public async Task Listener_Parses_Successfully_When_TranscriptPath_Is_Absent()
+    {
+        using var listener = new HookEventListener(preferredPort: 51940);
+        var received = new TaskCompletionSource<ActivitySignal>();
+        listener.SignalReceived += signal => received.TrySetResult(signal);
+
+        var payload = """{"cwd":"C:\\work\\my-project"}""";
+        var response = await Client.PostAsync(
+            new Uri(listener.BaseAddress, "hooks/stop"),
+            new StringContent(payload, Encoding.UTF8, "application/json"));
+
+        Assert.True(response.IsSuccessStatusCode);
+        var completed = await Task.WhenAny(received.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        Assert.Same(received.Task, completed);
+
+        var signal = await received.Task;
+        Assert.Null(signal.TranscriptPath);
+    }
+
+    [Fact]
     public async Task Listener_Responds_404_For_An_Unknown_Route()
     {
         using var listener = new HookEventListener(preferredPort: 51920);

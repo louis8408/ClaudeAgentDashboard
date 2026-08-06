@@ -11,10 +11,12 @@ Represents a single detected Claude Code CLI run on the local machine.
 | Field | Type | Notes |
 |---|---|---|
 | `Id` | opaque identifier | Stable for the lifetime of the detected process; derived from OS process id + start time to avoid PID-reuse collisions. |
-| `Label` | string | Identifying label derived from working directory and/or terminal title (per spec Key Entities). |
+| `Label` | string | Identifying, *display* label derived from working directory and/or terminal title (per spec Key Entities) — never used for correlation once `WorkingDirectory` is available (see FR-018). |
+| `WorkingDirectory` | string? | The process's actual resolved working directory (R15), used as the primary key to match incoming `ActivitySignal`s (FR-018). Null if resolution failed (unsupported OS/architecture, access denied) — correlation then falls back to the weaker `Label`-substring match (R10's original behavior), never a hard failure. |
 | `SessionState` | `SessionState` enum | `Running`, `Ended`. Coarse lifecycle, always derivable from process/window observation alone (R3–R5). |
 | `ActivityState` | `ActivityState` enum | `Unknown`, `Working`, `Idle`, `WaitingForInput`. Fine-grained in-session activity, only ever advances past `Unknown` once a hook signal has been received for this session (FR-013). Frozen/ignored once `SessionState = Ended`. |
 | `ActivitySummary` | string? | Human-readable "what it's doing" text sourced from the most recent `ActivitySignal` (e.g. tool name + short input summary, or a notification/question's text). Null until the first signal arrives. Powers the User Story 4 detail view. |
+| `TranscriptPath` | string? | Path to Claude Code's own transcript file for this session, sourced from the most recent `ActivitySignal` that carried one (R16, FR-019). Null until a signal supplies it. Read-only, display-only — never written to. |
 | `ActivityChangedAt` | timestamp? | Timestamp of the signal that produced the current `ActivityState`/`ActivitySummary`, used to reject out-of-order/delayed signals (R10, spec edge case). |
 | `StartedAt` | timestamp | When the session was first detected. |
 | `EndedAt` | timestamp? | Set when `SessionState` becomes `Ended`; null while running. |
@@ -63,10 +65,11 @@ need to retain a full history for v1.
 
 | Field | Type | Notes |
 |---|---|---|
-| `CorrelationKey` | value (cwd, and session id once known) | Used to match this signal to an `AgentSession` (R10). |
+| `CorrelationKey` | value (cwd, and session id once known) | Used to match this signal to an `AgentSession` (R10), now matched primarily against `AgentSession.WorkingDirectory` rather than `Label` (R15, FR-018). |
 | `HookEvent` | `HookEvent` enum | `UserPromptSubmit`, `PreToolUse`, `Stop`, `Notification`, `SessionEnd` — see contracts/hook-event-contract.md for the wire shape each maps from. |
 | `OccurredAt` | timestamp | From the hook payload if it carries one, else the time the signal was received. |
 | `SummaryText` | string? | Short human-readable text for this signal (tool name + input summary for `PreToolUse`; the notification text for `Notification`; null for purely state-transition events). |
+| `TranscriptPath` | string? | Passed through from the hook payload's `transcript_path` field where present (R16); folded onto the target `AgentSession.TranscriptPath`. |
 
 **Mapping to `ActivityState`** (R8): `UserPromptSubmit`/`PreToolUse` → `Working`; `Stop` → `Idle`; `Notification` → `WaitingForInput`; `SessionEnd` → forces `SessionState = Ended` (and makes `ActivityState` moot).
 
@@ -105,3 +108,27 @@ No `Dismissed` status is modeled — dismissal (FR-012) removes the
 `AgentSession` from the active list entirely rather than representing it as
 a state value, keeping the state machine minimal per the constitution's
 simplicity expectations.
+
+## Desktop layout preference (persisted via `ISettingsStore`, R14)
+
+Not a Domain entity with identity or behavior of its own — a small piece of
+persisted user preference state, exposed through the same `ISettingsStore`
+port as the existing `LaunchAtLoginEnabled`, following the spec's new
+"Desktop Layout" Key Entity.
+
+| Field | Type | Notes |
+|---|---|---|
+| `CardPositions` | map: agent label (string) → `CardPosition` | Keyed by the same identifying label shown on the card (spec Assumptions) — not `AgentSession.Id`, which is regenerated every run. An agent identity with no entry yet gets a default, non-overlapping position (FR-016, edge case). |
+| `BackgroundImagePath` | string? | Absolute path to the user-selected background image (R13); null/missing means the default background. If the path no longer resolves to a readable file, the Presentation layer falls back to the default rather than treating this as an error. |
+
+`CardPosition` is a plain `(double X, double Y)` pair in the desktop
+surface's own coordinate space — no relationship to OS screen coordinates,
+so it stays valid across different monitor setups.
+
+**Validation rules**:
+- A `CardPositions` entry is written only on drag-release (not on every
+  pointer-move), so a cancelled/aborted drag never persists a partial
+  position.
+- Two agent identities sharing a label share a `CardPositions` entry (spec
+  edge case) — this is accepted, not guarded against; dragging either
+  card writes its own new entry going forward.

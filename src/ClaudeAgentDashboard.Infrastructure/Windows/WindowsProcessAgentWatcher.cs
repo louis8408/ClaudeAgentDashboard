@@ -46,7 +46,14 @@ public sealed class WindowsProcessAgentWatcher : IAgentWatcher, IDisposable
                 continue;
             }
 
-            var session = new AgentSession(Guid.NewGuid(), label, DateTimeOffset.UtcNow, new TerminalWindowReference(processId));
+            // Resolving the real working directory (R15/FR-018) is what makes hook correlation
+            // actually work for the ordinary case — the command-line-derived label alone never
+            // contains it for a bare `claude` invocation. A resolution failure (unsupported
+            // architecture, access denied, anything else) yields null here and correlation
+            // degrades to the pre-existing label-based fallback, per the spec's edge case.
+            var workingDirectory = WindowsWorkingDirectoryResolver.Resolve(processId);
+            var session = new AgentSession(
+                Guid.NewGuid(), label, DateTimeOffset.UtcNow, new TerminalWindowReference(processId), workingDirectory);
 
             if (_sessions.TryAdd(processId, session) && raiseEvents)
             {

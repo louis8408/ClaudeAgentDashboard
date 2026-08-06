@@ -7,15 +7,19 @@ public sealed class AgentSession
 {
     public Guid Id { get; }
     public string Label { get; }
+    public string? WorkingDirectory { get; }
     public SessionState SessionState { get; private set; }
     public ActivityState ActivityState { get; private set; }
     public string? ActivitySummary { get; private set; }
+    public string? TranscriptPath { get; private set; }
     public DateTimeOffset? ActivityChangedAt { get; private set; }
     public DateTimeOffset StartedAt { get; }
     public DateTimeOffset? EndedAt { get; private set; }
     public TerminalWindowReference WindowReference { get; }
 
-    public AgentSession(Guid id, string label, DateTimeOffset startedAt, TerminalWindowReference windowReference)
+    public AgentSession(
+        Guid id, string label, DateTimeOffset startedAt, TerminalWindowReference windowReference,
+        string? workingDirectory = null)
     {
         if (string.IsNullOrWhiteSpace(label))
         {
@@ -24,6 +28,7 @@ public sealed class AgentSession
 
         Id = id;
         Label = label;
+        WorkingDirectory = workingDirectory;
         StartedAt = startedAt;
         WindowReference = windowReference ?? throw new ArgumentNullException(nameof(windowReference));
         SessionState = SessionState.Running;
@@ -73,6 +78,11 @@ public sealed class AgentSession
 
         ActivityState = MapToActivityState(signal.HookEvent);
         ActivitySummary = signal.SummaryText;
+        if (signal.TranscriptPath is not null)
+        {
+            TranscriptPath = signal.TranscriptPath;
+        }
+
         ActivityChangedAt = signal.OccurredAt;
         return true;
     }

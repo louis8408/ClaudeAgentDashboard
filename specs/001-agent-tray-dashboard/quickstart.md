@@ -42,8 +42,9 @@ the interfaces exercised.
 
 1. Start two Claude Code CLI sessions in two separate terminal windows.
 2. Click the tray/menu-bar icon.
-3. **Expected**: A window opens within 2 seconds (SC-001) listing both
-   sessions, each marked `Running`.
+3. **Expected**: The dashboard window opens within 2 seconds (SC-001)
+   showing one card per session on the desktop surface, each marked
+   `Running`.
 4. Start a third agent in a new terminal window without closing the
    dashboard.
 5. **Expected**: The third agent appears in the list without restarting
@@ -92,15 +93,52 @@ Prerequisite: hooks registered (see setup step above).
 Prerequisite: hooks registered.
 
 1. With an agent actively running a tool, open the dashboard and click
-   that agent's list entry (not "Show").
-2. **Expected**: A detail view opens within 2 seconds (SC-007) describing
-   the current activity (e.g., the tool being run).
-3. Leave the detail view open and let the agent's activity change (e.g.,
-   it finishes the tool and starts waiting for input).
-4. **Expected**: The detail view updates in place to reflect the new
-   activity without being reopened.
+   that agent's card (not "Show").
+2. **Expected**: A detail overlay opens within 2 seconds (SC-007), inside
+   the same dashboard window, describing the current activity (e.g., the
+   tool being run) and offering that agent's actions (Show, and Dismiss
+   once ended).
+3. Leave the overlay open and let the agent's activity change (e.g., it
+   finishes the tool and starts waiting for input).
+4. **Expected**: The overlay updates in place to reflect the new activity
+   without being reopened.
+5. Close the overlay.
+6. **Expected**: The dashboard returns to the card view in the same
+   window — no separate window closes or is left behind.
 
-### 5. Idle resource footprint (SC-006)
+### 5. Arrange and personalize the desktop (User Story 5)
+
+1. With two or more agents running, open the dashboard and drag one
+   agent's card to a new position.
+2. **Expected**: The card stays exactly where dropped (SC-008); no
+   auto-reflow or snap-back.
+3. Restart the application.
+4. **Expected**: That agent's card reappears at the position it was
+   dragged to.
+5. Open the background customization action and select an image file.
+6. **Expected**: The dashboard surface immediately shows that image as
+   its background.
+7. Restart the application.
+8. **Expected**: The same background is shown without reselecting it
+   (SC-009).
+
+### 6. Activity detection correlates correctly for an ordinary session (SC-010, FR-018)
+
+Prerequisite: hooks registered (see setup step above).
+
+1. Start a Claude Code CLI session with the plain `claude` command — no
+   extra arguments — the ordinary case.
+2. Give it a task so it runs a tool.
+3. **Expected**: Within the existing live-refresh interval, the card and
+   detail overlay show `Working`, not `Unknown` — no restart, no manual
+   action needed beyond the one-time hook setup.
+4. Open that agent's detail overlay.
+5. **Expected**: A read-only section shows recent content from the
+   session's transcript, refreshing as the conversation continues
+   (FR-019). No control that sends input back to the agent is present
+   anywhere in this view.
+
+### 7. Idle resource footprint (SC-006)
 
 1. With no agents running (or agents idle) and the dashboard's own window
    closed, let the app sit in the tray/menu bar for several minutes.
@@ -227,6 +265,94 @@ level.)
   observed at rest across multiple runs; no perceptible slowdown to other
   applications. Not measured with a profiler — Task Manager-level
   observation only.
+- **T089 (User Story 5 — desktop/card UI) — 2026-08-06**: `DesktopWindow`
+  opened showing the real, currently-running Claude Code CLI session
+  (`"C:\Users\louis\.local\bin\claude.exe"`) as a card with icon/label/
+  status ("Running", gray dot — correct, since hooks aren't registered on
+  this run). Verified live, end-to-end, via UI Automation + screenshots
+  (not just code review):
+  - Clicking the card opened `AgentDetailOverlay` in place over the same
+    window (with a dimmed scrim behind it), showing the full label, live
+    "Unknown (activity detection requires hook setup)" status text, and a
+    "Show" button (Dismiss correctly hidden — session isn't `Ended`).
+  - Clicking the overlay's close button returned to the card view in the
+    same window — no second window involved at any point (FR-014).
+  - Dragging the card (simulated pointer down → move → up) moved it
+    smoothly and, on release, wrote its new position to
+    `%APPDATA%\ClaudeAgentDashboard\settings.json` under
+    `CardPositions` keyed by the agent's label — confirmed by reading the
+    file directly.
+  - Restarted the application (`taskkill` + relaunch) and confirmed the
+    card reappeared at exactly the dragged-to position — SC-008 verified
+    across a real restart, not just via the `JsonSettingsStore` unit-level
+    round-trip tests (T079/T080, also passing).
+  - The "Choose background…" button is present and wired to
+    `StorageProvider.OpenFilePickerAsync`; **not** exercised interactively
+    in this pass (a real file-picker dialog isn't safely automatable via
+    UI Automation without risking a stuck modal), so SC-009's actual file
+    selection + persistence + restart round-trip was validated only at
+    the `ISettingsStore`/`JsonSettingsStore` unit level (T080), not
+    end-to-end through the picker UI. Worth a manual pass before calling
+    this fully signed off.
+  - Verification required bypassing the tray icon (still affected by the
+    unresolved blank-bitmap issue above — Explorer's overflow flyout
+    exposes it as one of several unnamed icons with no reliable way to
+    tell them apart from outside the process) via a temporary
+    `--open-dashboard` CLI switch added and removed for this session only;
+    it is not present in the committed code.
+- **Diagnosed — activity detection correlation bug (FR-018), found while
+  dogfooding, 2026-08-06**: a real Claude Code CLI session (this app's own
+  running session, started as a plain `claude` command) stayed `Unknown`
+  even with hooks confirmed registered in `~/.claude/settings.json`
+  pointing at the live listener (`127.0.0.1:51820`). Diagnosed empirically
+  by posting synthetic payloads directly to the running listener with
+  `curl`, not by inspection alone:
+  - `POST /hooks/pre-tool-use` with a realistic `cwd`
+    (`.../ClaudeAgentDashboard`) → `200 OK` (accepted and parsed), but the
+    card stayed `Unknown` — the signal was silently dropped at
+    correlation, not at ingestion.
+  - The same route with a `cwd` deliberately crafted to substring-overlap
+    the session's command-line-derived label → the card turned `Working`
+    (blue dot, badge text) within the next 2-second poll, with **no**
+    manual refresh, restart, or any other action taken. This isolates the
+    defect precisely: the live-update/rendering pipeline is correct
+    end-to-end; only the correlation match (R10) is broken for the
+    ordinary case, because `WindowsProcessAgentWatcher` has no way to
+    learn a process's actual working directory from WMI and falls back to
+    the full command line, which for a bare `claude` invocation never
+    contains it.
+  - Fix tracked as R15/FR-018 (PEB-based working-directory resolution) —
+    not yet implemented as of this log entry.
+- **T109 (correlation fix + transcript display, FR-018/FR-019) — fixed and
+  verified live, 2026-08-06**: implemented `WindowsWorkingDirectoryResolver`
+  (PEB reading via `NtQueryInformationProcess` + `ReadProcessMemory`) and
+  wired it into `WindowsProcessAgentWatcher`; `AgentSessionRegistry`
+  updated to prefer the resolved `WorkingDirectory` over the label. All 18
+  new automated tests (T091–T108) pass — full suite 100 passed, 9 skipped
+  (macOS-only), 0 failed. Beyond the automated suite, re-ran the exact
+  live diagnostic from the earlier bug report against this session's own
+  real Claude Code CLI process, on the running app:
+  - Re-sent the same synthetic `cwd` (this repo's real path) that was
+    previously silently ignored — this time the card turned `Working`
+    (blue badge) within the next poll, with no restart. Confirms
+    `WindowsWorkingDirectoryResolver` correctly resolved this real
+    process's actual working directory and correlation now uses it.
+  - Sent a payload additionally carrying a `transcript_path` pointing at a
+    real temp JSONL file with three lines (a `user` message, an
+    `assistant` text message, and an `assistant` tool-use block with no
+    `text` field). The overlay's new "Recent transcript" section rendered
+    the first two as `role: text`, and the third — which the schema-
+    tolerant reader couldn't extract clean text from — as its raw JSON
+    line, confirming the designed graceful-fallback behavior (R16) rather
+    than dropping or crashing on an entry it didn't fully understand.
+  - The overlay's hook-setup guidance text was also corrected (T108) to
+    stop suggesting "restart this session" once hooks are registered,
+    since that was never the actual fix.
+  - Not verified: real Claude Code hook payloads were not observed
+    directly in this session (all transcript verification used a
+    synthetic payload); the `transcript_path` field's presence/shape in
+    genuine Claude Code hook traffic is assumed from the wire contract,
+    not confirmed against a live Claude Code hook invocation.
 
 ### macOS — not executed
 
@@ -234,5 +360,9 @@ level.)
 The macOS-specific code (`MacProcessAgentWatcher`, `MacWindowFocuser`,
 `MacUserNotifier`, `MacLoginItemRegistrar`) compiles and its tests are
 correctly skip-guarded, but none of it has been executed on a real Mac.
+The same applies to T101's `lsof`-based working-directory resolution
+added to `MacProcessAgentWatcher` — implemented to the same contract as
+the Windows fix (best-effort, null on any failure) but not run against a
+real Claude Code CLI session on macOS.
 In particular, `MacUserNotifier.NotificationActivated` is a documented,
 known gap (see its class-level doc comment) independent of this.
