@@ -18,6 +18,9 @@ public sealed class TrayIconController : IDisposable
 
     private readonly NativeMenuItem _quitItem;
 
+    /// <summary>Raised when the user clicks the tray/menu-bar icon (User Story 1).</summary>
+    public event EventHandler? DashboardRequested;
+
     public TrayIconController()
     {
         _quitItem = new NativeMenuItem("Quit");
@@ -31,13 +34,16 @@ public sealed class TrayIconController : IDisposable
             ToolTipText = "Claude Agent Dashboard",
             Menu = menu,
         };
+        trayIcon.Clicked += OnTrayIconClicked;
 
-        Avalonia.Controls.TrayIcon.SetIcons(Application.Current!, new TrayIcons { trayIcon });
+        Avalonia.Controls.TrayIcon.SetIcons(Avalonia.Application.Current!, new TrayIcons { trayIcon });
     }
+
+    private void OnTrayIconClicked(object? sender, EventArgs e) => DashboardRequested?.Invoke(this, EventArgs.Empty);
 
     private static void OnQuitClicked(object? sender, EventArgs e)
     {
-        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.Shutdown();
         }
@@ -46,6 +52,6 @@ public sealed class TrayIconController : IDisposable
     public void Dispose()
     {
         _quitItem.Click -= OnQuitClicked;
-        Avalonia.Controls.TrayIcon.SetIcons(Application.Current!, null!);
+        Avalonia.Controls.TrayIcon.SetIcons(Avalonia.Application.Current!, null!);
     }
 }

@@ -1,3 +1,8 @@
+using System.Runtime.Versioning;
+using ClaudeAgentDashboard.Application.UseCases;
+using ClaudeAgentDashboard.Domain.Ports;
+using ClaudeAgentDashboard.Infrastructure.MacOS;
+using ClaudeAgentDashboard.Infrastructure.Windows;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ClaudeAgentDashboard.Presentation;
@@ -22,21 +27,27 @@ public static class CompositionRoot
             RegisterMacServices(services);
         }
 
+        services.AddSingleton<OpenDashboardQuery>();
+
         return services.BuildServiceProvider();
     }
 
+    [SupportedOSPlatform("windows")]
     private static void RegisterWindowsServices(IServiceCollection services)
     {
-        // IAgentWatcher -> WindowsProcessAgentWatcher (User Story 1)
+        services.AddSingleton<IAgentWatcher, WindowsProcessAgentWatcher>();
+
         // IWindowFocuser -> Win32WindowFocuser (User Story 2)
         // INotifier -> WindowsToastNotifier (User Story 3)
         // IAgentActivityFeed / IHookRegistrar -> HookEventListener / ClaudeCodeHookRegistrar (User Story 3)
         // ISettingsStore -> JsonSettingsStore (Polish)
     }
 
+    [SupportedOSPlatform("macos")]
     private static void RegisterMacServices(IServiceCollection services)
     {
-        // IAgentWatcher -> MacProcessAgentWatcher (User Story 1)
+        services.AddSingleton<IAgentWatcher, MacProcessAgentWatcher>();
+
         // IWindowFocuser -> MacWindowFocuser (User Story 2)
         // INotifier -> MacUserNotifier (User Story 3)
         // IAgentActivityFeed / IHookRegistrar -> HookEventListener / ClaudeCodeHookRegistrar (User Story 3)

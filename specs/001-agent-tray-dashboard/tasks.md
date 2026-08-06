@@ -158,40 +158,40 @@ start — see quickstart.md scenario 1.
 
 > Write these tests FIRST, confirm they FAIL, then implement.
 
-- [ ] T031 [P] [US1] Write failing integration test: spawn a real process matching the Claude Code CLI
+- [X] T031 [P] [US1] Write failing integration test: spawn a real process matching the Claude Code CLI
       signature **before** constructing/starting the watcher, then assert
       `WindowsProcessAgentWatcher.GetCurrentSessions()` finds it — proving the "already running before the
       app started" path (FR-010), not just "starts while watching" — in
       `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/WindowsProcessAgentWatcherTests.cs`
       (Windows-only)
-- [ ] T032 [P] [US1] Write failing integration test: spawn a real process matching the Claude Code CLI
+- [X] T032 [P] [US1] Write failing integration test: spawn a real process matching the Claude Code CLI
       signature **before** constructing/starting the watcher, then assert
       `MacProcessAgentWatcher.GetCurrentSessions()` finds it — proving the "already running before the app
       started" path (FR-010), not just "starts while watching" — in
       `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/MacProcessAgentWatcherTests.cs`
       (macOS-only)
-- [ ] T033 [P] [US1] Write failing unit test: `OpenDashboardQuery` returns every session (already-running
+- [X] T033 [P] [US1] Write failing unit test: `OpenDashboardQuery` returns every session (already-running
       and newly started) from a faked `IAgentWatcher`, and an empty result when none are running, in
       `tests/ClaudeAgentDashboard.Application.UnitTests/OpenDashboardQueryTests.cs`
 
 ### Implementation for User Story 1
 
-- [ ] T034 [US1] Implement `WindowsProcessAgentWatcher` (WMI process enumeration + command-line matching +
+- [X] T034 [US1] Implement `WindowsProcessAgentWatcher` (WMI process enumeration + command-line matching +
       `SessionStarted` on newly detected processes; `GetCurrentSessions()` also finds processes that
       started before the watcher did) in
       `src/ClaudeAgentDashboard.Infrastructure/Windows/WindowsProcessAgentWatcher.cs`, making T031 pass
       (depends on T020, T023)
-- [ ] T035 [US1] Implement `MacProcessAgentWatcher` (`ps` enumeration + command-line matching +
+- [X] T035 [US1] Implement `MacProcessAgentWatcher` (`ps` enumeration + command-line matching +
       `SessionStarted`; `GetCurrentSessions()` also finds processes that started before the watcher did) in
       `src/ClaudeAgentDashboard.Infrastructure/MacOS/MacProcessAgentWatcher.cs`, making T032 pass (depends
       on T020, T023)
-- [ ] T036 [US1] Implement `OpenDashboardQuery` in
+- [X] T036 [US1] Implement `OpenDashboardQuery` in
       `src/ClaudeAgentDashboard.Application/UseCases/OpenDashboardQuery.cs`, making T033 pass
-- [ ] T037 [US1] Implement `AgentListWindow` (list bound to sessions showing `SessionState` and
+- [X] T037 [US1] Implement `AgentListWindow` (list bound to sessions showing `SessionState` and
       `ActivityState` — the latter naturally `Unknown` until User Story 3's activity feed exists — plus
       empty state) in `src/ClaudeAgentDashboard.Presentation/Views/AgentListWindow.axaml` and `.axaml.cs`
       (depends on T036) — Presentation task, no preceding test per constitution v1.1.0
-- [ ] T038 [US1] Wire tray icon click → `OpenDashboardQuery` → `AgentListWindow`, and register the
+- [X] T038 [US1] Wire tray icon click → `OpenDashboardQuery` → `AgentListWindow`, and register the
       OS-appropriate `IAgentWatcher` in `CompositionRoot`, in
       `src/ClaudeAgentDashboard.Presentation/TrayIcon/TrayIconController.cs` and
       `src/ClaudeAgentDashboard.Presentation/CompositionRoot.cs` (depends on T034, T035, T037) —
