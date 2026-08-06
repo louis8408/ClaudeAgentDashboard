@@ -358,19 +358,19 @@ per plan.md; the view itself is a separate, independently-addable slice.)
 
 > Write this test FIRST, confirm it FAILS, then implement.
 
-- [ ] T068 [P] [US4] Write failing unit test: `ViewAgentActivityQuery` returns the current `ActivityState`
+- [X] T068 [P] [US4] Write failing unit test: `ViewAgentActivityQuery` returns the current `ActivityState`
       and `ActivitySummary` for a session, reflecting the most recently applied `ActivitySignal`, using a
       faked session store, in
       `tests/ClaudeAgentDashboard.Application.UnitTests/ViewAgentActivityQueryTests.cs`
 
 ### Implementation for User Story 4
 
-- [ ] T069 [US4] Implement `ViewAgentActivityQuery` in
+- [X] T069 [US4] Implement `ViewAgentActivityQuery` in
       `src/ClaudeAgentDashboard.Application/UseCases/ViewAgentActivityQuery.cs`, making T068 pass
-- [ ] T070 [US4] Implement `AgentActivityDetailView` (live-updating activity summary) in
+- [X] T070 [US4] Implement `AgentActivityDetailView` (live-updating activity summary) in
       `src/ClaudeAgentDashboard.Presentation/Views/AgentActivityDetailView.axaml` and `.axaml.cs` (depends
       on T069) — Presentation task, no preceding test per constitution v1.1.0
-- [ ] T071 [US4] Wire a click on an agent's list entry (distinct from "Show") in `AgentListWindow` to open
+- [X] T071 [US4] Wire a click on an agent's list entry (distinct from "Show") in `AgentListWindow` to open
       `AgentActivityDetailView` via `ViewAgentActivityQuery`, in
       `src/ClaudeAgentDashboard.Presentation/Views/AgentListWindow.axaml`/`.axaml.cs` (depends on T070;
       touches the same file as T037/T045/T065 — sequence after them) — Presentation task, no preceding

@@ -49,7 +49,8 @@ public partial class App : Avalonia.Application
         var openDashboardQuery = Services.GetRequiredService<OpenDashboardQuery>();
         var showAgentCommand = Services.GetRequiredService<ShowAgentCommand>();
         var dismissAgentCommand = Services.GetRequiredService<DismissAgentCommand>();
-        var window = new AgentListWindow(openDashboardQuery, showAgentCommand, dismissAgentCommand);
+        var viewAgentActivityQuery = Services.GetRequiredService<ViewAgentActivityQuery>();
+        var window = new AgentListWindow(openDashboardQuery, showAgentCommand, dismissAgentCommand, viewAgentActivityQuery);
         window.Show();
         window.Activate();
     }

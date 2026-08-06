@@ -21,18 +21,24 @@ public partial class AgentListWindow : Window
     private readonly OpenDashboardQuery? _openDashboardQuery;
     private readonly ShowAgentCommand _showAgentCommand;
     private readonly DismissAgentCommand? _dismissAgentCommand;
+    private readonly ViewAgentActivityQuery? _viewAgentActivityQuery;
     private readonly DispatcherTimer? _refreshTimer;
 
     public AgentListWindow()
-        : this(null, new ShowAgentCommand(new UnavailableWindowFocuser()), null)
+        : this(null, new ShowAgentCommand(new UnavailableWindowFocuser()), null, null)
     {
     }
 
-    public AgentListWindow(OpenDashboardQuery? openDashboardQuery, ShowAgentCommand showAgentCommand, DismissAgentCommand? dismissAgentCommand)
+    public AgentListWindow(
+        OpenDashboardQuery? openDashboardQuery,
+        ShowAgentCommand showAgentCommand,
+        DismissAgentCommand? dismissAgentCommand,
+        ViewAgentActivityQuery? viewAgentActivityQuery)
     {
         _openDashboardQuery = openDashboardQuery;
         _showAgentCommand = showAgentCommand;
         _dismissAgentCommand = dismissAgentCommand;
+        _viewAgentActivityQuery = viewAgentActivityQuery;
 
         InitializeComponent();
         Render(openDashboardQuery?.Execute() ?? []);
@@ -64,6 +70,18 @@ public partial class AgentListWindow : Window
 
         var result = _showAgentCommand.Execute(session);
         ShowUnavailableMessageIfNeeded(session, result);
+    }
+
+    private void OnAgentEntryClicked(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: AgentSession session })
+        {
+            return;
+        }
+
+        var detailView = new AgentActivityDetailView(session.Label, session.Id, _viewAgentActivityQuery);
+        detailView.Show();
+        detailView.Activate();
     }
 
     private void OnDismissClicked(object? sender, RoutedEventArgs e)

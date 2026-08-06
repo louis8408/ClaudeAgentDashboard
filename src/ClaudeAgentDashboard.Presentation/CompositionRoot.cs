@@ -47,6 +47,7 @@ public static class CompositionRoot
         services.AddSingleton<ApplyActivitySignalCommand>();
         services.AddSingleton<HandleNotificationActivatedCommand>();
         services.AddSingleton<DismissAgentCommand>();
+        services.AddSingleton<ViewAgentActivityQuery>();
 
         var provider = services.BuildServiceProvider();
         WireEventSubscriptions(provider);
