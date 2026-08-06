@@ -7,32 +7,39 @@
 ## Summary
 
 A cross-platform (Windows + macOS) background application with a system
-tray/menu-bar icon that lists currently running Claude Code CLI agent
-sessions, lets the user jump to any agent's terminal window, and raises an
-OS-native notification — click-to-focus — when an agent finishes. Built in
-C#/.NET with Avalonia UI, structured as four Clean Architecture layers
-(Domain/Application/Infrastructure/Presentation) with platform-specific
-process/window/notification interop isolated entirely in Infrastructure
-behind Domain-owned interfaces, developed test-first with unit,
-integration, and architecture test layers per the project constitution.
+tray/menu-bar icon that lists currently detected Claude Code CLI agent
+sessions — each showing whether it is working, idle, waiting for input, or
+ended — lets the user jump to any agent's terminal window or view a
+detail summary of what it's doing, and raises an OS-native notification —
+click-to-focus — the moment an agent stops actively working (idle, needs
+input, or its session ends), never while it continues working. Session
+presence/lifecycle is detected passively via OS process/window
+observation; fine-grained activity is sourced from Claude Code's own hook
+events via a one-time local setup step, ingested over a loopback-only HTTP
+listener the app hosts. Built in C#/.NET with Avalonia UI, structured as
+four Clean Architecture layers (Domain/Application/Infrastructure/
+Presentation) with platform-specific and hook-ingestion interop isolated
+entirely in Infrastructure behind Domain-owned interfaces, developed
+test-first with unit, integration, and architecture test layers per the
+project constitution.
 
 ## Technical Context
 
 **Language/Version**: C# 12 / .NET 8 (LTS)
 
-**Primary Dependencies**: Avalonia UI 11.x (cross-platform UI + built-in `TrayIcon`); Windows toast notifications via the unpackaged-app toast API; macOS `UNUserNotificationCenter` via native interop; Win32 `user32.dll` P/Invoke (window enumeration/focus) on Windows; AppKit/Core Graphics interop on macOS
+**Primary Dependencies**: Avalonia UI 11.x (cross-platform UI + built-in `TrayIcon`); Windows toast notifications via the unpackaged-app toast API; macOS `UNUserNotificationCenter` via native interop; Win32 `user32.dll` P/Invoke (window enumeration/focus) on Windows; AppKit/Core Graphics interop on macOS; a minimal loopback-only HTTP listener (.NET's built-in `HttpListener`/Kestrel minimal APIs) for ingesting Claude Code hook payloads
 
-**Storage**: No database. In-memory `AgentSession` list only (rebuilt on startup by re-scanning processes); one user preference (launch-at-login) persisted in a local JSON settings file under the OS per-user app-data directory
+**Storage**: No database. In-memory `AgentSession` list only (rebuilt on startup by re-scanning processes; activity state rebuilds from `Unknown` until the next hook signal); one user preference (launch-at-login) persisted in a local JSON settings file under the OS per-user app-data directory; hook command registration is written into the user's existing Claude Code configuration file, not a dashboard-owned store
 
 **Testing**: xUnit; `NetArchTest.Rules` for architecture tests; `coverlet.collector` for coverage; `SonarAnalyzer.CSharp` static analysis with new-code warnings as errors
 
 **Target Platform**: Windows 10 (1809+) / Windows 11, and macOS 13 (Ventura)+; Linux architecturally unblocked but out of scope for v1
 
-**Project Type**: Desktop application (background tray/menu-bar app, single executable, no server component)
+**Project Type**: Desktop application (background tray/menu-bar app, single executable, embedding a local-only HTTP listener — no externally-reachable server component)
 
-**Performance Goals**: Agent list populated within 2s of tray click (SC-001); "Show" focuses the correct window within 1s (SC-002); completion notification appears within 5s of process exit (SC-003)
+**Performance Goals**: Agent list populated within 2s of tray click (SC-001); "Show" focuses the correct window within 1s (SC-002); attention notification (idle/waiting-for-input/ended) appears within 5s of that transition, with zero notifications while merely working (SC-003); activity detail view populated within 2s of clicking an entry (SC-007)
 
-**Constraints**: No elevated/admin privileges required for install or normal operation; passive observation only — must not require modifying or instrumenting the Claude Code CLI itself (spec Assumptions); negligible idle resource footprint (SC-006)
+**Constraints**: No elevated/admin privileges required for install or normal operation; session presence/lifecycle detection remains passive (process/window observation); fine-grained activity detection is the one deliberate exception, requiring a one-time local hook registration step rather than per-session configuration or agent control (spec Assumptions, FR-013); negligible idle resource footprint (SC-006)
 
 **Scale/Scope**: Single user, single machine; realistically 1–20 concurrently running agents
 
@@ -45,12 +52,18 @@ integration, and architecture test layers per the project constitution.
 | I. Clean Architecture Layering | Four-project structure below enforces Domain → Application → Infrastructure → Presentation with platform interop confined to Infrastructure. | PASS |
 | II. Test-First (NON-NEGOTIABLE) | tasks.md (next phase) will sequence failing tests before implementation for every use case. | PASS (process commitment, enforced at task/implementation time) |
 | III. Three-Layer Test Coverage | Four dedicated test projects planned: Domain/Application unit tests, Infrastructure integration tests, and a standalone architecture-test project. | PASS |
-| IV. SOLID Design | Domain ports (`IAgentWatcher`, `IWindowFocuser`, `INotifier`, `ISettingsStore`) are narrow and single-purpose (ISP/SRP); platform implementations are swappable behind them (OCP/DIP); no implementation is expected to violate LSP since each port has exactly one implementation per OS. | PASS |
+| IV. SOLID Design | Domain ports (`IAgentWatcher`, `IAgentActivityFeed`, `IWindowFocuser`, `INotifier`, `IHookRegistrar`, `ISettingsStore`) are narrow and single-purpose (ISP/SRP) — session lifecycle, in-session activity, window focus, notification, hook setup, and preferences are deliberately separate ports rather than one broad "AgentManager"; platform implementations are swappable behind them (OCP/DIP); no implementation is expected to violate LSP since each port has exactly one implementation per OS. | PASS |
 | V. Code Quality Gate | `SonarAnalyzer.CSharp` + `Directory.Build.props` + SonarCloud CI scan planned as part of Setup tasks, ahead of feature-code tasks. | PASS |
 
-No deviations — Complexity Tracking table is empty (see below).
+One deviation requiring justification — see Complexity Tracking below: the
+local HTTP listener for hook ingestion (R9) is new infrastructure
+complexity introduced by this revision.
 
-*(Re-checked post Phase 1 design: the data model and contracts introduced no new external dependencies or layering exceptions — gate still PASSES.)*
+*(Re-checked post Phase 1 design: the data model and contracts confirm the
+listener stays entirely inside Infrastructure behind `IAgentActivityFeed`
+and `IHookRegistrar` — Domain/Application never see HTTP concerns — so the
+layering gate still PASSES; the complexity itself is justified, not
+eliminated, below.)*
 
 ## Project Structure
 
@@ -58,13 +71,14 @@ No deviations — Complexity Tracking table is empty (see below).
 
 ```text
 specs/001-agent-tray-dashboard/
-├── plan.md              # This file (/speckit-plan command output)
-├── research.md          # Phase 0 output
-├── data-model.md        # Phase 1 output
-├── quickstart.md        # Phase 1 output
+├── plan.md                       # This file (/speckit-plan command output)
+├── research.md                   # Phase 0 output
+├── data-model.md                 # Phase 1 output
+├── quickstart.md                 # Phase 1 output
 ├── contracts/
-│   └── domain-ports.md  # Phase 1 output
-└── tasks.md              # Phase 2 output (/speckit-tasks command - NOT created by /speckit-plan)
+│   ├── domain-ports.md           # Phase 1 output
+│   └── hook-event-contract.md    # Phase 1 output — the one genuine external wire contract
+└── tasks.md                      # Phase 2 output (/speckit-tasks command - NOT created by /speckit-plan)
 ```
 
 ### Source Code (repository root)
@@ -73,19 +87,25 @@ specs/001-agent-tray-dashboard/
 src/
 ├── ClaudeAgentDashboard.Domain/
 │   ├── AgentSession.cs
-│   ├── AgentStatus.cs
+│   ├── SessionState.cs
+│   ├── ActivityState.cs
+│   ├── ActivitySignal.cs
 │   ├── TerminalWindowReference.cs
-│   ├── CompletionNotification.cs
+│   ├── AttentionNotification.cs
 │   └── Ports/
 │       ├── IAgentWatcher.cs
+│       ├── IAgentActivityFeed.cs
 │       ├── IWindowFocuser.cs
 │       ├── INotifier.cs
+│       ├── IHookRegistrar.cs
 │       └── ISettingsStore.cs
 │
 ├── ClaudeAgentDashboard.Application/
 │   └── UseCases/
 │       ├── OpenDashboardQuery.cs
 │       ├── ShowAgentCommand.cs
+│       ├── ViewAgentActivityQuery.cs
+│       ├── ApplyActivitySignalCommand.cs   # correlates a signal (R10) and decides whether it crosses a notify-worthy transition (R11)
 │       ├── DismissAgentCommand.cs
 │       └── HandleNotificationActivatedCommand.cs
 │
@@ -98,6 +118,9 @@ src/
 │   │   ├── MacProcessAgentWatcher.cs
 │   │   ├── MacWindowFocuser.cs
 │   │   └── MacUserNotifier.cs
+│   ├── Hooks/
+│   │   ├── HookEventListener.cs        # loopback HTTP listener implementing IAgentActivityFeed (R9)
+│   │   └── ClaudeCodeHookRegistrar.cs  # implements IHookRegistrar against the user's Claude Code config
 │   └── Settings/
 │       └── JsonSettingsStore.cs
 │
@@ -106,7 +129,8 @@ src/
     ├── TrayIcon/
     │   └── TrayIconController.cs
     ├── Views/
-    │   └── AgentListWindow.axaml (+ .cs)
+    │   ├── AgentListWindow.axaml (+ .cs)
+    │   └── AgentActivityDetailView.axaml (+ .cs)
     ├── CompositionRoot.cs   # DI wiring: binds Domain ports to the OS-appropriate Infrastructure implementation
     └── Program.cs
 
@@ -130,5 +154,6 @@ the four `src/` projects (and the solution updated to include the four
 
 ## Complexity Tracking
 
-*No Constitution Check violations — this section intentionally left
-without entries.*
+| Violation | Why Needed | Simpler Alternative Rejected Because |
+|---|---|---|
+| Local loopback HTTP listener + hook registration (R9, `IAgentActivityFeed`/`IHookRegistrar`) — a new inter-process communication surface beyond the pure OS-observation approach of the original plan | Distinguishing Working / Idle / Waiting-for-input requires knowing what is happening *inside* a Claude Code session; OS process/window observation alone (the original, simpler design) can only ever see whether a session exists, not what it's doing. Claude Code's hooks are the only reliable, officially-exposed signal for this. | Transcript-file tailing and terminal screen-scraping were both evaluated as "simpler, zero-config" alternatives and explicitly rejected (research.md R8) — undocumented/unstable file format risk and cross-terminal-emulator fragility respectively, both worse long-term costs than one well-documented local HTTP listener behind a narrow port interface. |
