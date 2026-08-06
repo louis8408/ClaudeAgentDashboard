@@ -28,6 +28,7 @@ public static class CompositionRoot
         }
 
         services.AddSingleton<OpenDashboardQuery>();
+        services.AddSingleton<ShowAgentCommand>();
 
         return services.BuildServiceProvider();
     }
@@ -36,8 +37,8 @@ public static class CompositionRoot
     private static void RegisterWindowsServices(IServiceCollection services)
     {
         services.AddSingleton<IAgentWatcher, WindowsProcessAgentWatcher>();
+        services.AddSingleton<IWindowFocuser, Win32WindowFocuser>();
 
-        // IWindowFocuser -> Win32WindowFocuser (User Story 2)
         // INotifier -> WindowsToastNotifier (User Story 3)
         // IAgentActivityFeed / IHookRegistrar -> HookEventListener / ClaudeCodeHookRegistrar (User Story 3)
         // ISettingsStore -> JsonSettingsStore (Polish)
@@ -47,8 +48,8 @@ public static class CompositionRoot
     private static void RegisterMacServices(IServiceCollection services)
     {
         services.AddSingleton<IAgentWatcher, MacProcessAgentWatcher>();
+        services.AddSingleton<IWindowFocuser, MacWindowFocuser>();
 
-        // IWindowFocuser -> MacWindowFocuser (User Story 2)
         // INotifier -> MacUserNotifier (User Story 3)
         // IAgentActivityFeed / IHookRegistrar -> HookEventListener / ClaudeCodeHookRegistrar (User Story 3)
         // ISettingsStore -> JsonSettingsStore (Polish)

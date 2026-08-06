@@ -43,7 +43,8 @@ public partial class App : Avalonia.Application
     private void OpenDashboard()
     {
         var sessions = Services.GetRequiredService<OpenDashboardQuery>().Execute();
-        var window = new AgentListWindow(sessions);
+        var showAgentCommand = Services.GetRequiredService<ShowAgentCommand>();
+        var window = new AgentListWindow(sessions, showAgentCommand);
         window.Show();
         window.Activate();
     }

@@ -213,32 +213,32 @@ the correct terminal window is raised and focused, including when minimized — 
 
 > Write these tests FIRST, confirm they FAIL, then implement.
 
-- [ ] T039 [P] [US2] Write failing integration test: `Win32WindowFocuser` brings a real spawned window to
+- [X] T039 [P] [US2] Write failing integration test: `Win32WindowFocuser` brings a real spawned window to
       the foreground and reports success; reports "not available" once that window is closed, in
       `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/Win32WindowFocuserTests.cs` (Windows-only)
-- [ ] T040 [P] [US2] Write failing integration test: `MacWindowFocuser` activates a real running
+- [X] T040 [P] [US2] Write failing integration test: `MacWindowFocuser` activates a real running
       application and reports success; reports "not available" once it has quit, in
       `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/MacWindowFocuserTests.cs` (macOS-only)
-- [ ] T041 [P] [US2] Write failing unit test: `ShowAgentCommand` calls `IWindowFocuser.Focus` with the
+- [X] T041 [P] [US2] Write failing unit test: `ShowAgentCommand` calls `IWindowFocuser.Focus` with the
       session's `TerminalWindowReference` and surfaces the `FocusResult`, using a faked `IWindowFocuser`,
       in `tests/ClaudeAgentDashboard.Application.UnitTests/ShowAgentCommandTests.cs`
 
 ### Implementation for User Story 2
 
-- [ ] T042 [US2] Implement `Win32WindowFocuser` (`EnumWindows`/`GetWindowThreadProcessId`/
+- [X] T042 [US2] Implement `Win32WindowFocuser` (`EnumWindows`/`GetWindowThreadProcessId`/
       `SetForegroundWindow`, with the `AttachThreadInput` foreground-lock workaround) in
       `src/ClaudeAgentDashboard.Infrastructure/Windows/Win32WindowFocuser.cs`, making T039 pass (depends on
       T021, T025)
-- [ ] T043 [US2] Implement `MacWindowFocuser` (`NSRunningApplication.activateWithOptions` interop) in
+- [X] T043 [US2] Implement `MacWindowFocuser` (`NSRunningApplication.activateWithOptions` interop) in
       `src/ClaudeAgentDashboard.Infrastructure/MacOS/MacWindowFocuser.cs`, making T040 pass (depends on
       T021, T025)
-- [ ] T044 [US2] Implement `ShowAgentCommand` in
+- [X] T044 [US2] Implement `ShowAgentCommand` in
       `src/ClaudeAgentDashboard.Application/UseCases/ShowAgentCommand.cs`, making T041 pass
-- [ ] T045 [US2] Add a "Show" button and FR-011 "window no longer available" messaging to `AgentListWindow`
+- [X] T045 [US2] Add a "Show" button and FR-011 "window no longer available" messaging to `AgentListWindow`
       in `src/ClaudeAgentDashboard.Presentation/Views/AgentListWindow.axaml` and `.axaml.cs` (depends on
       T044; touches the same file as T037 — sequence after it) — Presentation task, no preceding test per
       constitution v1.1.0
-- [ ] T046 [US2] Register the OS-appropriate `IWindowFocuser` in `CompositionRoot`, in
+- [X] T046 [US2] Register the OS-appropriate `IWindowFocuser` in `CompositionRoot`, in
       `src/ClaudeAgentDashboard.Presentation/CompositionRoot.cs` (depends on T042, T043) — Presentation
       task, no preceding test per constitution v1.1.0
 
