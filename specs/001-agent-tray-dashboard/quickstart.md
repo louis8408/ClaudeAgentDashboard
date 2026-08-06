@@ -142,8 +142,12 @@ These scenarios are backed by tasks.md's test suite:
 
 ### Windows — 2026-08-06
 
-Machine: Windows 11 Pro, build 10.0.26200 (an Insider/Canary-channel
-build number, notably ahead of any current stable release).
+Machine: Windows 11 Pro, version 25H2 (build 10.0.26200) — the current
+stable release channel, confirmed via `HKLM\SOFTWARE\Microsoft\Windows
+NT\CurrentVersion\DisplayVersion` and `Win32_OperatingSystem.Caption`.
+(An earlier note in this log incorrectly called this an Insider/Canary
+build; it isn't — 26200 is 25H2 stable as of this machine's patch
+level.)
 
 - **T075 (Windows)**: Ran the full automated suite (68 passing, 9
   correctly skipped macOS-only tests) plus a series of manual app
@@ -170,13 +174,55 @@ build number, notably ahead of any current stable release).
   - Ruled out stale shell state: restarted `explorer.exe` between attempts;
     same result both before and after.
   - This isolates the problem to Avalonia's Win32 tray-icon rendering (or
-    Shell_NotifyIcon's icon handling) specifically on this build, not to
-    application code or the icon asset. **Needs re-validation on a
-    standard/stable Windows release** before concluding FR-001/FR-009's
-    tray-icon visibility genuinely works end-to-end; everything
-    downstream of "the icon is clickable" (list, Show, Dismiss, detail
-    view, notifications) is validated independently via the automated
-    suite and does not depend on this rendering path.
+    Shell_NotifyIcon's icon handling) on this machine, not to application
+    code or the icon asset; everything downstream of "the icon is
+    clickable" (list, Show, Dismiss, detail view, notifications) is
+    validated independently via the automated suite and does not depend
+    on this rendering path.
+  - **Follow-up investigation (2026-08-06, same session)**: dug further
+    after discovering the OS is stable 25H2, not Insider/Canary as
+    previously (incorrectly) logged above, so an OS-build explanation no
+    longer fit.
+    - Found and fixed a real, separate bug while investigating: the
+      Presentation `.csproj` had no `<ApplicationIcon>`, so the compiled
+      `.exe` carried no embedded Win32 icon resource at all. Fixed by
+      adding `<ApplicationIcon>Assets\tray-icon.ico</ApplicationIcon>`.
+      Confirmed via `Icon.ExtractAssociatedIcon` against the rebuilt exe
+      that the icon now embeds and decodes correctly — full blue circle
+      with white dot, not blank. This also confirms `tray-icon.ico`
+      itself is well-formed (byte-level ICONDIR/PNG-IHDR parsing checked
+      out too: single 32×32 PNG-in-ICO entry, `colorType=6` RGBA,
+      `bitDepth=8`, no truncation).
+    - This incidentally explains an earlier, inconclusive side-experiment:
+      pinning the icon via Settings → Taskbar → "Other system tray icons"
+      showed our app's row rendering as a flat solid-blue square (no
+      white dot) — before the fix that page was reading the exe's
+      (missing) own icon resource, a completely different code path from
+      the live `Shell_NotifyIcon` bitmap Avalonia sets at runtime. It
+      does not exercise the runtime rendering path at all, so it can't
+      confirm or rule out the overflow-vs-main-tray hypothesis.
+    - **After the `ApplicationIcon` fix, re-ran the app and re-checked the
+      live `HKCU\Control Panel\NotifyIconSettings` cached `IconSnapshot`
+      for the running instance: still fully transparent** (rendered
+      against a magenta background: solid magenta, zero content),
+      identical to before the fix. This rules the exe's embedded icon
+      resource in or out cleanly: it's out — the missing
+      `ApplicationIcon` was a real bug worth fixing, but it was not the
+      cause of the blank tray bitmap. The blank bitmap is specific to the
+      HICON Avalonia constructs at runtime (via `CreateIconFromResourceEx`
+      in `Win32Icon.cs`) and hands to `Shell_NotifyIcon`, not to the icon
+      asset, the exe's resources, or the OS build/channel.
+    - **Net conclusion**: root cause narrowed to Avalonia 12.1.1's
+      Win32 tray-icon HICON construction/hand-off on this specific
+      Windows 11 25H2 install, reproducible and isolated at every layer
+      we could reach without attaching a native debugger to inspect the
+      HICON's pixel data in-process (which would be the natural next
+      step, along with testing a classic BMP+AND-mask ICO instead of
+      PNG-compressed, and testing against a different Avalonia version).
+      Not yet fixed; documented here rather than worked around, since a
+      workaround (e.g., swapping to a non-Avalonia native tray icon P/Invoke
+      path) would be a substantial scope change outside this diagnostic
+      session.
 - **T075 (SC-006 idle check)**: idle memory ~110–120MB, no sustained CPU
   observed at rest across multiple runs; no perceptible slowdown to other
   applications. Not measured with a profiler — Task Manager-level

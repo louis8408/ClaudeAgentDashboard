@@ -109,8 +109,26 @@ public sealed class MacProcessAgentWatcher : IAgentWatcher, IDisposable
         }
     }
 
-    private static bool IsClaudeCodeSignature(string commandLine) =>
-        commandLine.Contains("claude", StringComparison.OrdinalIgnoreCase);
+    // A raw substring search across the whole command line false-matches on anything with
+    // "claude" anywhere in its path or arguments — including the Claude Desktop app and this
+    // repo's own processes when launched from a path containing "ClaudeAgentDashboard".
+    // Matching only the executable's own base name, and excluding the Desktop app's .app
+    // bundle path, is what actually distinguishes the Claude Code CLI.
+    private static bool IsClaudeCodeSignature(string commandLine)
+    {
+        var executablePath = ExtractExecutablePath(commandLine);
+        var executableName = Path.GetFileName(executablePath);
+
+        return string.Equals(executableName, "claude", StringComparison.Ordinal)
+            && !executablePath.Contains(".app/Contents", StringComparison.Ordinal);
+    }
+
+    private static string ExtractExecutablePath(string commandLine)
+    {
+        var trimmed = commandLine.TrimStart();
+        var spaceIndex = trimmed.IndexOf(' ', StringComparison.Ordinal);
+        return spaceIndex > 0 ? trimmed[..spaceIndex] : trimmed;
+    }
 
     private static string DeriveLabel(string commandLine) =>
         commandLine.Length <= 80 ? commandLine : commandLine[..80];

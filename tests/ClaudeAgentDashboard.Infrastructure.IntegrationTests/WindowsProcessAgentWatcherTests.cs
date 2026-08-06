@@ -69,17 +69,29 @@ public class WindowsProcessAgentWatcherTests
         }
     }
 
+    // WindowsProcessAgentWatcher now matches on the executable's own base name (not a raw
+    // command-line substring), so the marker process must actually be named claude.exe — a
+    // throwaway copy of cmd.exe under that name, well away from any WindowsApps path.
     private static Process StartMarkerProcess()
     {
+        var markerExePath = CreateMarkerExecutable();
         var startInfo = new ProcessStartInfo
         {
-            FileName = "cmd.exe",
+            FileName = markerExePath,
             Arguments = "/c \"echo claude-agent-test-marker & ping -n 10 127.0.0.1 >nul\"",
             UseShellExecute = false,
             CreateNoWindow = true,
         };
 
         return Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start marker process.");
+    }
+
+    private static string CreateMarkerExecutable()
+    {
+        var markerExePath = Path.Combine(Path.GetTempPath(), $"claude-{Guid.NewGuid():N}", "claude.exe");
+        Directory.CreateDirectory(Path.GetDirectoryName(markerExePath)!);
+        File.Copy(Environment.ExpandEnvironmentVariables(@"%SystemRoot%\System32\cmd.exe"), markerExePath);
+        return markerExePath;
     }
 
     private static void WaitForWmiVisibility(int processId)
@@ -102,6 +114,25 @@ public class WindowsProcessAgentWatcherTests
         catch (InvalidOperationException)
         {
             // Already exited between the check and the kill — fine.
+        }
+
+        TryDeleteMarkerDirectory(process.StartInfo.FileName);
+    }
+
+    private static void TryDeleteMarkerDirectory(string markerExePath)
+    {
+        try
+        {
+            var directory = Path.GetDirectoryName(markerExePath);
+            if (directory is not null && Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+        catch (IOException)
+        {
+            // Best-effort cleanup — a lingering handle on the just-killed exe is not worth
+            // failing the test over.
         }
     }
 }

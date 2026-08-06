@@ -82,12 +82,17 @@ validation log, not swept under the rug:
   directory without reading the process's PEB, which was evaluated and
   deferred — see `research.md` R10). When it misses, activity just stays
   `Unknown`; agent detection and "Show" are unaffected.
-- **Tray icon visibility could not be confirmed** on the Windows machine
-  this was built on (Windows 11 build 26200, an Insider/Canary-channel
-  build). Extensive empirical debugging (see `quickstart.md`) isolated
-  this to the OS/Avalonia rendering path, not application code — ruled
-  out by testing with a known-good Windows system icon and getting the
-  identical result. Needs re-validation on a standard Windows release.
+- **Tray icon bitmap renders blank on Windows** — confirmed on Windows 11
+  Pro 25H2 (build 26200, the current stable release; an earlier note
+  here wrongly called it Insider/Canary). The icon registers correctly
+  with the shell and is clickable, but its pixel content is blank. Ruled
+  out: the icon asset/format (swapped in a known-good system icon, same
+  result), the exe's own icon resource (was genuinely missing — fixed by
+  adding `<ApplicationIcon>` — but the live tray bitmap stayed blank
+  after the fix, so that wasn't it either), DPI scaling, and stale shell
+  state. Isolated to Avalonia 12.1.1's Win32 HICON construction/hand-off
+  to `Shell_NotifyIcon` on this machine. See `quickstart.md`'s validation
+  log for the full trail; not yet fixed.
 - **macOS was never executed.** All macOS-specific code compiles and its
   tests are correctly skip-guarded, but none of it has run on real
   hardware in this session.

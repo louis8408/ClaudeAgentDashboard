@@ -71,17 +71,34 @@ public class MacProcessAgentWatcherTests
 
     private static void WaitForProcessTableVisibility() => Thread.Sleep(300);
 
+    // MacProcessAgentWatcher now matches on the executable's own base name (not a raw
+    // command-line substring), so the marker process must actually be named "claude" — a
+    // throwaway copy of /bin/sh under that name.
     private static Process StartMarkerProcess()
     {
+        var markerExePath = CreateMarkerExecutable();
         var startInfo = new ProcessStartInfo
         {
-            FileName = "/bin/sh",
+            FileName = markerExePath,
             Arguments = "-c \"echo claude-agent-test-marker; sleep 10\"",
             UseShellExecute = false,
             CreateNoWindow = true,
         };
 
         return Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start marker process.");
+    }
+
+    private static string CreateMarkerExecutable()
+    {
+        var markerDirectory = Path.Combine(Path.GetTempPath(), $"claude-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(markerDirectory);
+        var markerExePath = Path.Combine(markerDirectory, "claude");
+        File.Copy("/bin/sh", markerExePath);
+        File.SetUnixFileMode(markerExePath,
+            UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+            | UnixFileMode.GroupRead | UnixFileMode.GroupExecute
+            | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+        return markerExePath;
     }
 
     private static void TryKill(Process process)
@@ -96,6 +113,25 @@ public class MacProcessAgentWatcherTests
         catch (InvalidOperationException)
         {
             // Already exited between the check and the kill — fine.
+        }
+
+        TryDeleteMarkerDirectory(process.StartInfo.FileName);
+    }
+
+    private static void TryDeleteMarkerDirectory(string markerExePath)
+    {
+        try
+        {
+            var directory = Path.GetDirectoryName(markerExePath);
+            if (directory is not null && Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+        catch (IOException)
+        {
+            // Best-effort cleanup — a lingering handle on the just-killed exe is not worth
+            // failing the test over.
         }
     }
 }

@@ -86,8 +86,39 @@ public sealed class WindowsProcessAgentWatcher : IAgentWatcher, IDisposable
         }
     }
 
-    private static bool IsClaudeCodeSignature(string commandLine) =>
-        commandLine.Contains("claude", StringComparison.OrdinalIgnoreCase);
+    // A raw substring search across the whole command line false-matches on anything with
+    // "claude" anywhere in its path or arguments — including the Claude Desktop app (whose
+    // command lines are full of claude-branded URL schemes/flags) and this repo's own
+    // processes when launched from a path containing "ClaudeAgentDashboard". Matching only
+    // the executable's own base name, and excluding MSIX-packaged (WindowsApps) paths, is
+    // what actually distinguishes the Claude Code CLI: Claude Desktop's executable is also
+    // named claude.exe, so the name alone isn't enough to tell them apart.
+    private static bool IsClaudeCodeSignature(string commandLine)
+    {
+        var executablePath = ExtractExecutablePath(commandLine);
+        var executableName = Path.GetFileNameWithoutExtension(executablePath);
+
+        return string.Equals(executableName, "claude", StringComparison.OrdinalIgnoreCase)
+            && !executablePath.Contains("WindowsApps", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ExtractExecutablePath(string commandLine)
+    {
+        var trimmed = commandLine.TrimStart();
+        if (trimmed.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        if (trimmed[0] == '"')
+        {
+            var closingQuote = trimmed.IndexOf('"', 1);
+            return closingQuote > 0 ? trimmed[1..closingQuote] : trimmed[1..];
+        }
+
+        var spaceIndex = trimmed.IndexOf(' ', StringComparison.Ordinal);
+        return spaceIndex > 0 ? trimmed[..spaceIndex] : trimmed;
+    }
 
     private static string DeriveLabel(string commandLine) =>
         commandLine.Length <= 80 ? commandLine : commandLine[..80];
