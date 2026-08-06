@@ -8,19 +8,21 @@ description: "Task list for Agent Tray Dashboard implementation"
 
 **Input**: Design documents from `/specs/001-agent-tray-dashboard/`
 
-**Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/domain-ports.md, quickstart.md
+**Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/domain-ports.md,
+contracts/hook-event-contract.md, quickstart.md
 
 **Tests**: Included and sequenced test-first (write → confirm failing → implement). The project constitution
 (`.specify/memory/constitution.md`, Principles II–III) makes TDD and three-layer test coverage
 non-negotiable for this project, overriding the "tests are optional" default.
 
 **Organization**: Tasks are grouped by user story (from spec.md) to enable independent implementation and
-testing of each story, per Setup → Foundational → User Story 1 → User Story 2 → User Story 3 → Polish.
+testing of each story: Setup → Foundational → User Story 1 → User Story 2 → User Story 3 → User Story 4 →
+Polish.
 
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies)
-- **[Story]**: Which user story this task belongs to (US1, US2, US3)
+- **[Story]**: Which user story this task belongs to (US1, US2, US3, US4)
 - Every task includes an exact file path
 
 ## Path Conventions
@@ -29,9 +31,9 @@ Four-project Clean Architecture layout under `src/`, mirrored by four test proje
 plan.md's Project Structure:
 
 ```text
-src/ClaudeAgentDashboard.Domain/
-src/ClaudeAgentDashboard.Application/
-src/ClaudeAgentDashboard.Infrastructure/{Windows,MacOS,Settings}/
+src/ClaudeAgentDashboard.Domain/{Ports/}
+src/ClaudeAgentDashboard.Application/UseCases/
+src/ClaudeAgentDashboard.Infrastructure/{Windows,MacOS,Hooks,Settings}/
 src/ClaudeAgentDashboard.Presentation/{TrayIcon,Views}/
 tests/ClaudeAgentDashboard.Domain.UnitTests/
 tests/ClaudeAgentDashboard.Application.UnitTests/
@@ -43,8 +45,7 @@ tests/ClaudeAgentDashboard.Architecture.Tests/
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-**Purpose**: Project initialization and CI/analysis wiring, ahead of any feature code (constitution:
-Setup phase precedes feature work).
+**Purpose**: Project initialization and CI/analysis wiring, ahead of any feature code.
 
 - [ ] T001 Create the four `src/` projects and four `tests/` projects listed in plan.md's Project
       Structure, and update `ClaudeAgentDashboard.sln` to reference all eight, removing the placeholder
@@ -55,6 +56,8 @@ Setup phase precedes feature work).
       a net8.0 class library referencing `ClaudeAgentDashboard.Domain`
 - [ ] T004 [P] Initialize `src/ClaudeAgentDashboard.Infrastructure/ClaudeAgentDashboard.Infrastructure.csproj`
       as a net8.0 class library referencing `ClaudeAgentDashboard.Domain` and `ClaudeAgentDashboard.Application`
+      (the hook listener uses the built-in `System.Net.HttpListener` — no extra package needed, per
+      research.md R9)
 - [ ] T005 [P] Initialize `src/ClaudeAgentDashboard.Presentation/ClaudeAgentDashboard.Presentation.csproj` as
       an Avalonia net8.0 desktop application referencing all three layers, with `Avalonia` and
       `Avalonia.Desktop` package references
@@ -76,44 +79,60 @@ Setup phase precedes feature work).
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-**Purpose**: Domain entities, port interfaces, the layering rule, and the minimal app shell that every
-user story builds on (constitution: Foundational phase defines Domain entities/ports before any
-Application/Infrastructure implementation).
+**Purpose**: Domain entities, enums, port interfaces, the layering rule, and the minimal app shell every
+user story builds on.
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T011 [P] Write architecture tests asserting Domain has zero outward dependencies, Application
-      depends only on Domain, and Infrastructure implementations are referenced only from Presentation, in
-      `tests/ClaudeAgentDashboard.Architecture.Tests/LayeringTests.cs` (these act as regression guards from
-      this point forward — they pass trivially now and must keep passing as later phases add code)
-- [ ] T012 [P] Write failing unit tests for `AgentSession` construction and the `Running → Finished` state
-      transition, including the `FinishedAt` null/non-null invariant, in
+- [ ] T011 [P] Write architecture tests asserting Domain has zero outward dependencies, Application depends
+      only on Domain, and Infrastructure implementations (including the `Hooks` subfolder) are referenced
+      only from Presentation, in `tests/ClaudeAgentDashboard.Architecture.Tests/LayeringTests.cs` (these act
+      as regression guards from this point forward — they pass trivially now and must keep passing as later
+      phases add code)
+- [ ] T012 [P] Write failing unit tests for `AgentSession`: construction; the `SessionState`
+      `Running → Ended` transition and `EndedAt` invariant; `ApplySignal(ActivitySignal)` mapping each
+      `HookEvent` to the correct `ActivityState` (`UserPromptSubmit`/`PreToolUse` → `Working`, `Stop` →
+      `Idle`, `Notification` → `WaitingForInput`, `SessionEnd` → forces `SessionState = Ended`); and the
+      newest-timestamp-wins guard against out-of-order signals (spec edge case), in
       `tests/ClaudeAgentDashboard.Domain.UnitTests/AgentSessionTests.cs`
-- [ ] T013 [P] Write failing unit tests for `TerminalWindowReference`'s one-way `IsResolvable` transition
-      in `tests/ClaudeAgentDashboard.Domain.UnitTests/TerminalWindowReferenceTests.cs`
-- [ ] T014 [P] Write failing unit tests for `CompletionNotification` construction and its link back to an
-      `AgentSession` id in `tests/ClaudeAgentDashboard.Domain.UnitTests/CompletionNotificationTests.cs`
-- [ ] T015 [P] Implement the `AgentStatus` enum (`Running`, `Finished`) in
-      `src/ClaudeAgentDashboard.Domain/AgentStatus.cs`
-- [ ] T016 Implement the `AgentSession` entity in `src/ClaudeAgentDashboard.Domain/AgentSession.cs`, making
-      T012 pass (depends on T015)
-- [ ] T017 [P] Implement the `TerminalWindowReference` entity in
+- [ ] T013 [P] Write failing unit tests for `TerminalWindowReference`'s one-way `IsResolvable` transition in
+      `tests/ClaudeAgentDashboard.Domain.UnitTests/TerminalWindowReferenceTests.cs`
+- [ ] T014 [P] Write failing unit tests for `AttentionNotification` construction and its
+      `AgentSessionId`/`Reason` linkage in
+      `tests/ClaudeAgentDashboard.Domain.UnitTests/AttentionNotificationTests.cs`
+- [ ] T015 [P] Implement the `SessionState` enum (`Running`, `Ended`) in
+      `src/ClaudeAgentDashboard.Domain/SessionState.cs`
+- [ ] T016 [P] Implement the `ActivityState` enum (`Unknown`, `Working`, `Idle`, `WaitingForInput`) in
+      `src/ClaudeAgentDashboard.Domain/ActivityState.cs`
+- [ ] T017 [P] Implement the `HookEvent` enum (`UserPromptSubmit`, `PreToolUse`, `Stop`, `Notification`,
+      `SessionEnd`) in `src/ClaudeAgentDashboard.Domain/HookEvent.cs`
+- [ ] T018 [P] Implement the `AttentionReason` enum (`Idle`, `WaitingForInput`, `Ended`) in
+      `src/ClaudeAgentDashboard.Domain/AttentionReason.cs`
+- [ ] T019 [P] Implement the `ActivitySignal` type (correlation key, `HookEvent`, `OccurredAt`,
+      `SummaryText`) in `src/ClaudeAgentDashboard.Domain/ActivitySignal.cs` (depends on T017)
+- [ ] T020 Implement the `AgentSession` entity, including `ApplySignal`, in
+      `src/ClaudeAgentDashboard.Domain/AgentSession.cs`, making T012 pass (depends on T015, T016, T019)
+- [ ] T021 [P] Implement the `TerminalWindowReference` entity in
       `src/ClaudeAgentDashboard.Domain/TerminalWindowReference.cs`, making T013 pass
-- [ ] T018 [P] Implement the `CompletionNotification` entity in
-      `src/ClaudeAgentDashboard.Domain/CompletionNotification.cs`, making T014 pass (depends on T016)
-- [ ] T019 [P] Define the `IAgentWatcher` port (`GetCurrentSessions`, `SessionStarted`, `SessionFinished`)
-      in `src/ClaudeAgentDashboard.Domain/Ports/IAgentWatcher.cs`
-- [ ] T020 [P] Define the `IWindowFocuser` port and `FocusResult` type in
+- [ ] T022 [P] Implement the `AttentionNotification` entity in
+      `src/ClaudeAgentDashboard.Domain/AttentionNotification.cs`, making T014 pass (depends on T018)
+- [ ] T023 [P] Define the `IAgentWatcher` port (`GetCurrentSessions`, `SessionStarted`, `SessionEnded`) in
+      `src/ClaudeAgentDashboard.Domain/Ports/IAgentWatcher.cs`
+- [ ] T024 [P] Define the `IAgentActivityFeed` port (`SignalReceived`) in
+      `src/ClaudeAgentDashboard.Domain/Ports/IAgentActivityFeed.cs`
+- [ ] T025 [P] Define the `IWindowFocuser` port and `FocusResult` type in
       `src/ClaudeAgentDashboard.Domain/Ports/IWindowFocuser.cs`
-- [ ] T021 [P] Define the `INotifier` port (`NotifyFinished`, `NotificationActivated`) in
+- [ ] T026 [P] Define the `INotifier` port (`NotifyAttention`, `NotificationActivated`) in
       `src/ClaudeAgentDashboard.Domain/Ports/INotifier.cs`
-- [ ] T022 [P] Define the `ISettingsStore` port in `src/ClaudeAgentDashboard.Domain/Ports/ISettingsStore.cs`
-- [ ] T023 Implement the Avalonia application shell and composition root —
+- [ ] T027 [P] Define the `IHookRegistrar` port (`AreHooksRegistered`, `RegisterHooks`) in
+      `src/ClaudeAgentDashboard.Domain/Ports/IHookRegistrar.cs`
+- [ ] T028 [P] Define the `ISettingsStore` port in `src/ClaudeAgentDashboard.Domain/Ports/ISettingsStore.cs`
+- [ ] T029 Implement the Avalonia application shell and composition root —
       `src/ClaudeAgentDashboard.Presentation/Program.cs`, `App.axaml`/`App.axaml.cs`, and
       `src/ClaudeAgentDashboard.Presentation/CompositionRoot.cs` with OS-conditional DI registration stubs
-      for the four ports (depends on T019–T022)
-- [ ] T024 Implement `TrayIconController` showing a persistent tray/menu-bar icon with a Quit action, in
-      `src/ClaudeAgentDashboard.Presentation/TrayIcon/TrayIconController.cs` (depends on T023) — satisfies
+      for all six ports (depends on T023–T028)
+- [ ] T030 Implement `TrayIconController` showing a persistent tray/menu-bar icon with a Quit action, in
+      `src/ClaudeAgentDashboard.Presentation/TrayIcon/TrayIconController.cs` (depends on T029) — satisfies
       the baseline "always-present icon" requirement (FR-001) all stories build on
 
 **Checkpoint**: Foundation ready — user story implementation can now begin.
@@ -123,7 +142,7 @@ Application/Infrastructure implementation).
 ## Phase 3: User Story 1 - See all running agents at a glance (Priority: P1) 🎯 MVP
 
 **Goal**: Clicking the tray/menu-bar icon opens a window listing every currently running Claude Code
-agent, updating as agents start, with an empty state when none are running.
+agent and its status, updating as agents start, with an empty state when none are running.
 
 **Independent Test**: Start several Claude Code CLI sessions in different terminal windows, click the
 tray/menu-bar icon, and confirm the popover lists one entry per running agent, updating as new agents
@@ -133,35 +152,37 @@ start — see quickstart.md scenario 1.
 
 > Write these tests FIRST, confirm they FAIL, then implement.
 
-- [ ] T025 [P] [US1] Write failing integration test: `WindowsProcessAgentWatcher.GetCurrentSessions()`
+- [ ] T031 [P] [US1] Write failing integration test: `WindowsProcessAgentWatcher.GetCurrentSessions()`
       detects a real spawned process matching the Claude Code CLI signature, in
       `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/WindowsProcessAgentWatcherTests.cs`
       (Windows-only)
-- [ ] T026 [P] [US1] Write failing integration test: `MacProcessAgentWatcher.GetCurrentSessions()` detects
+- [ ] T032 [P] [US1] Write failing integration test: `MacProcessAgentWatcher.GetCurrentSessions()` detects
       a real spawned process matching the Claude Code CLI signature, in
       `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/MacProcessAgentWatcherTests.cs`
       (macOS-only)
-- [ ] T027 [P] [US1] Write failing unit test: `OpenDashboardQuery` returns every session (already-running
+- [ ] T033 [P] [US1] Write failing unit test: `OpenDashboardQuery` returns every session (already-running
       and newly started) from a faked `IAgentWatcher`, and an empty result when none are running, in
       `tests/ClaudeAgentDashboard.Application.UnitTests/OpenDashboardQueryTests.cs`
 
 ### Implementation for User Story 1
 
-- [ ] T028 [US1] Implement `WindowsProcessAgentWatcher` (WMI process enumeration + command-line matching +
+- [ ] T034 [US1] Implement `WindowsProcessAgentWatcher` (WMI process enumeration + command-line matching +
       `SessionStarted` on newly detected processes) in
-      `src/ClaudeAgentDashboard.Infrastructure/Windows/WindowsProcessAgentWatcher.cs`, making T025 pass
-      (depends on T016, T019)
-- [ ] T029 [US1] Implement `MacProcessAgentWatcher` (`ps` enumeration + command-line matching +
+      `src/ClaudeAgentDashboard.Infrastructure/Windows/WindowsProcessAgentWatcher.cs`, making T031 pass
+      (depends on T020, T023)
+- [ ] T035 [US1] Implement `MacProcessAgentWatcher` (`ps` enumeration + command-line matching +
       `SessionStarted`) in `src/ClaudeAgentDashboard.Infrastructure/MacOS/MacProcessAgentWatcher.cs`,
-      making T026 pass (depends on T016, T019)
-- [ ] T030 [US1] Implement `OpenDashboardQuery` in
-      `src/ClaudeAgentDashboard.Application/UseCases/OpenDashboardQuery.cs`, making T027 pass
-- [ ] T031 [US1] Implement `AgentListWindow` (list bound to sessions, running status, empty state) in
-      `src/ClaudeAgentDashboard.Presentation/Views/AgentListWindow.axaml` and `.axaml.cs` (depends on T030)
-- [ ] T032 [US1] Wire tray icon click → `OpenDashboardQuery` → `AgentListWindow`, and register the
+      making T032 pass (depends on T020, T023)
+- [ ] T036 [US1] Implement `OpenDashboardQuery` in
+      `src/ClaudeAgentDashboard.Application/UseCases/OpenDashboardQuery.cs`, making T033 pass
+- [ ] T037 [US1] Implement `AgentListWindow` (list bound to sessions showing `SessionState` and
+      `ActivityState` — the latter naturally `Unknown` until User Story 3's activity feed exists — plus
+      empty state) in `src/ClaudeAgentDashboard.Presentation/Views/AgentListWindow.axaml` and `.axaml.cs`
+      (depends on T036)
+- [ ] T038 [US1] Wire tray icon click → `OpenDashboardQuery` → `AgentListWindow`, and register the
       OS-appropriate `IAgentWatcher` in `CompositionRoot`, in
       `src/ClaudeAgentDashboard.Presentation/TrayIcon/TrayIconController.cs` and
-      `src/ClaudeAgentDashboard.Presentation/CompositionRoot.cs` (depends on T028, T029, T031)
+      `src/ClaudeAgentDashboard.Presentation/CompositionRoot.cs` (depends on T034, T035, T037)
 
 **Checkpoint**: User Story 1 is fully functional and independently testable.
 
@@ -179,125 +200,179 @@ the correct terminal window is raised and focused, including when minimized — 
 
 > Write these tests FIRST, confirm they FAIL, then implement.
 
-- [ ] T033 [P] [US2] Write failing integration test: `Win32WindowFocuser` brings a real spawned window to
+- [ ] T039 [P] [US2] Write failing integration test: `Win32WindowFocuser` brings a real spawned window to
       the foreground and reports success; reports "not available" once that window is closed, in
       `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/Win32WindowFocuserTests.cs` (Windows-only)
-- [ ] T034 [P] [US2] Write failing integration test: `MacWindowFocuser` activates a real running
+- [ ] T040 [P] [US2] Write failing integration test: `MacWindowFocuser` activates a real running
       application and reports success; reports "not available" once it has quit, in
       `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/MacWindowFocuserTests.cs` (macOS-only)
-- [ ] T035 [P] [US2] Write failing unit test: `ShowAgentCommand` calls `IWindowFocuser.Focus` with the
+- [ ] T041 [P] [US2] Write failing unit test: `ShowAgentCommand` calls `IWindowFocuser.Focus` with the
       session's `TerminalWindowReference` and surfaces the `FocusResult`, using a faked `IWindowFocuser`,
       in `tests/ClaudeAgentDashboard.Application.UnitTests/ShowAgentCommandTests.cs`
 
 ### Implementation for User Story 2
 
-- [ ] T036 [US2] Implement `Win32WindowFocuser` (`EnumWindows`/`GetWindowThreadProcessId`/
+- [ ] T042 [US2] Implement `Win32WindowFocuser` (`EnumWindows`/`GetWindowThreadProcessId`/
       `SetForegroundWindow`, with the `AttachThreadInput` foreground-lock workaround) in
-      `src/ClaudeAgentDashboard.Infrastructure/Windows/Win32WindowFocuser.cs`, making T033 pass (depends on
-      T017, T020)
-- [ ] T037 [US2] Implement `MacWindowFocuser` (`NSRunningApplication.activateWithOptions` interop) in
-      `src/ClaudeAgentDashboard.Infrastructure/MacOS/MacWindowFocuser.cs`, making T034 pass (depends on
-      T017, T020)
-- [ ] T038 [US2] Implement `ShowAgentCommand` in
-      `src/ClaudeAgentDashboard.Application/UseCases/ShowAgentCommand.cs`, making T035 pass
-- [ ] T039 [US2] Add a "Show" button and FR-011 "window no longer available" messaging to `AgentListWindow`
+      `src/ClaudeAgentDashboard.Infrastructure/Windows/Win32WindowFocuser.cs`, making T039 pass (depends on
+      T021, T025)
+- [ ] T043 [US2] Implement `MacWindowFocuser` (`NSRunningApplication.activateWithOptions` interop) in
+      `src/ClaudeAgentDashboard.Infrastructure/MacOS/MacWindowFocuser.cs`, making T040 pass (depends on
+      T021, T025)
+- [ ] T044 [US2] Implement `ShowAgentCommand` in
+      `src/ClaudeAgentDashboard.Application/UseCases/ShowAgentCommand.cs`, making T041 pass
+- [ ] T045 [US2] Add a "Show" button and FR-011 "window no longer available" messaging to `AgentListWindow`
       in `src/ClaudeAgentDashboard.Presentation/Views/AgentListWindow.axaml` and `.axaml.cs` (depends on
-      T038; touches the same file as T031 — sequence after it)
-- [ ] T040 [US2] Register the OS-appropriate `IWindowFocuser` in `CompositionRoot`, in
-      `src/ClaudeAgentDashboard.Presentation/CompositionRoot.cs` (depends on T036, T037)
+      T044; touches the same file as T037 — sequence after it)
+- [ ] T046 [US2] Register the OS-appropriate `IWindowFocuser` in `CompositionRoot`, in
+      `src/ClaudeAgentDashboard.Presentation/CompositionRoot.cs` (depends on T042, T043)
 
 **Checkpoint**: User Stories 1 AND 2 both work independently.
 
 ---
 
-## Phase 5: User Story 3 - Get notified the moment an agent finishes (Priority: P2)
+## Phase 5: User Story 3 - Get notified only when an agent needs me (Priority: P2)
 
-**Goal**: An OS-native notification appears when a running agent finishes; clicking it focuses the
-correct window without opening the dashboard first, and the list reflects the finished status until
-dismissed.
+**Goal**: An OS-native notification appears the moment an agent stops actively working — goes idle, needs
+input, or its session ends — and never while it is merely working; clicking it focuses the correct window
+without opening the dashboard first, and the list reflects status live.
 
-**Independent Test**: Let an agent run to completion while the dashboard is closed and another
-application has focus; confirm a native notification appears and, when clicked, focuses the correct
-window — see quickstart.md scenario 3.
+**Independent Test**: With hooks registered, watch an agent work (no notification), then let it go idle,
+ask a permission question, or end its session (each raises a distinct notification); click a notification
+and confirm it focuses the correct window — see quickstart.md scenario 3.
 
 ### Tests for User Story 3
 
 > Write these tests FIRST, confirm they FAIL, then implement.
 
-- [ ] T041 [P] [US3] Write failing integration test: `WindowsProcessAgentWatcher` raises `SessionFinished`
+- [ ] T047 [P] [US3] Write failing integration test: `WindowsProcessAgentWatcher` raises `SessionEnded`
       within the poll interval after a tracked process exits, in
       `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/WindowsProcessAgentWatcherTests.cs`
-- [ ] T042 [P] [US3] Write failing integration test: `MacProcessAgentWatcher` raises `SessionFinished`
-      within the poll interval after a tracked process exits, in
+- [ ] T048 [P] [US3] Write failing integration test: `MacProcessAgentWatcher` raises `SessionEnded` within
+      the poll interval after a tracked process exits, in
       `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/MacProcessAgentWatcherTests.cs`
-- [ ] T043 [P] [US3] Write failing integration test: `WindowsToastNotifier` delivers a real toast for a
-      finished session and raises `NotificationActivated` when clicked, in
+- [ ] T049 [P] [US3] Write failing integration test: `HookEventListener` parses a valid payload on each of
+      the five routes in contracts/hook-event-contract.md into the correct `ActivitySignal`
+      (`HookEvent` + correlation key + `SummaryText`), and responds with a `4xx` without crashing for a
+      malformed payload, in
+      `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/HookEventListenerTests.cs`
+- [ ] T050 [P] [US3] Write failing integration test: `ClaudeCodeHookRegistrar` writes the five expected hook
+      commands into a temporary Claude Code config file pointed at a given listener address, and is
+      idempotent (a second call updates in place rather than duplicating entries), in
+      `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/ClaudeCodeHookRegistrarTests.cs`
+- [ ] T051 [P] [US3] Write failing unit test: `ApplyActivitySignalCommand` correlates an incoming
+      `ActivitySignal` to the right `AgentSession` by `cwd`/`session_id` (R10), applies the
+      newest-timestamp-wins rule, and calls `INotifier.NotifyAttention` only on a transition into `Idle`,
+      `WaitingForInput`, or `Ended` from a genuinely different state — never for `Working`, never twice for
+      the same unacknowledged attention state (FR-007, FR-007a, R11) — using a faked session store and
+      faked `INotifier`, in
+      `tests/ClaudeAgentDashboard.Application.UnitTests/ApplyActivitySignalCommandTests.cs`
+- [ ] T052 [P] [US3] Write failing integration test: `WindowsToastNotifier` delivers a real toast for each
+      `AttentionReason` and raises `NotificationActivated` when clicked, in
       `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/WindowsToastNotifierTests.cs`
       (Windows-only)
-- [ ] T044 [P] [US3] Write failing integration test: `MacUserNotifier` delivers a real
-      `UNUserNotification` for a finished session, raises `NotificationActivated` when clicked, and
-      reports `WasDelivered = false` when authorization is denied, in
+- [ ] T053 [P] [US3] Write failing integration test: `MacUserNotifier` delivers a real `UNUserNotification`
+      for each `AttentionReason`, raises `NotificationActivated` when clicked, and reports
+      `WasDelivered = false` when authorization is denied, in
       `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/MacUserNotifierTests.cs` (macOS-only)
-- [ ] T045 [P] [US3] Write failing unit test: `HandleNotificationActivatedCommand` resolves the correct
+- [ ] T054 [P] [US3] Write failing unit test: `HandleNotificationActivatedCommand` resolves the correct
       session's `TerminalWindowReference` and calls `IWindowFocuser.Focus` when
       `INotifier.NotificationActivated` fires, using faked `INotifier` and `IWindowFocuser`, in
       `tests/ClaudeAgentDashboard.Application.UnitTests/HandleNotificationActivatedCommandTests.cs`
-- [ ] T046 [P] [US3] Write failing unit test: `DismissAgentCommand` removes a `Finished` session from the
-      active list and is a no-op for a `Running` session, in
-      `tests/ClaudeAgentDashboard.Application.UnitTests/DismissAgentCommandTests.cs`
 
 ### Implementation for User Story 3
 
-- [ ] T047 [US3] Extend `WindowsProcessAgentWatcher` with finish-polling and the `SessionFinished` event,
-      making T041 pass (depends on T028)
-- [ ] T048 [US3] Extend `MacProcessAgentWatcher` with finish-polling and the `SessionFinished` event,
-      making T042 pass (depends on T029)
-- [ ] T049 [US3] Implement `WindowsToastNotifier` (AppUserModelID registration + toast APIs +
-      click-activation callback), making T043 pass, in
-      `src/ClaudeAgentDashboard.Infrastructure/Windows/WindowsToastNotifier.cs` (depends on T018, T021)
-- [ ] T050 [US3] Implement `MacUserNotifier` (`UNUserNotificationCenter` interop + authorization request +
-      click-activation callback), making T044 pass, in
-      `src/ClaudeAgentDashboard.Infrastructure/MacOS/MacUserNotifier.cs` (depends on T018, T021)
-- [ ] T051 [US3] Implement `HandleNotificationActivatedCommand` in
-      `src/ClaudeAgentDashboard.Application/UseCases/HandleNotificationActivatedCommand.cs`, making T045
-      pass
-- [ ] T052 [US3] Implement `DismissAgentCommand` in
-      `src/ClaudeAgentDashboard.Application/UseCases/DismissAgentCommand.cs`, making T046 pass
-- [ ] T053 [US3] Update `AgentListWindow` to reflect live `Running → Finished` status changes and add a
-      Dismiss action for finished entries, in
-      `src/ClaudeAgentDashboard.Presentation/Views/AgentListWindow.axaml` and `.axaml.cs` (depends on
-      T051, T052; touches the same file as T031/T039 — sequence after them)
-- [ ] T054 [US3] Update `TrayIconController` to indicate unacknowledged finished agents on the
-      tray/menu-bar icon (FR-009), in
-      `src/ClaudeAgentDashboard.Presentation/TrayIcon/TrayIconController.cs` (depends on T047, T048)
-- [ ] T055 [US3] Register the OS-appropriate `INotifier` in `CompositionRoot` and wire
-      `NotificationActivated` → `HandleNotificationActivatedCommand`, in
-      `src/ClaudeAgentDashboard.Presentation/CompositionRoot.cs` (depends on T049, T050, T051)
+- [ ] T055 [US3] Extend `WindowsProcessAgentWatcher` with `SessionEnded` detection, making T047 pass
+      (depends on T034)
+- [ ] T056 [US3] Extend `MacProcessAgentWatcher` with `SessionEnded` detection, making T048 pass (depends
+      on T035)
+- [ ] T057 [US3] Implement `HookEventListener` (loopback `HttpListener` hosting the five routes from
+      contracts/hook-event-contract.md, implementing `IAgentActivityFeed`), making T049 pass, in
+      `src/ClaudeAgentDashboard.Infrastructure/Hooks/HookEventListener.cs` (depends on T019, T024)
+- [ ] T058 [US3] Implement `ClaudeCodeHookRegistrar` (`IHookRegistrar`), making T050 pass, in
+      `src/ClaudeAgentDashboard.Infrastructure/Hooks/ClaudeCodeHookRegistrar.cs` (depends on T027)
+- [ ] T059 [US3] Implement `ApplyActivitySignalCommand` (correlation per R10, `AgentSession.ApplySignal`,
+      and the notify-decision per R11), making T051 pass, in
+      `src/ClaudeAgentDashboard.Application/UseCases/ApplyActivitySignalCommand.cs`
+- [ ] T060 [US3] Implement `WindowsToastNotifier`, making T052 pass, in
+      `src/ClaudeAgentDashboard.Infrastructure/Windows/WindowsToastNotifier.cs` (depends on T022, T026)
+- [ ] T061 [US3] Implement `MacUserNotifier`, making T053 pass, in
+      `src/ClaudeAgentDashboard.Infrastructure/MacOS/MacUserNotifier.cs` (depends on T022, T026)
+- [ ] T062 [US3] Implement `HandleNotificationActivatedCommand`, making T054 pass, in
+      `src/ClaudeAgentDashboard.Application/UseCases/HandleNotificationActivatedCommand.cs`
+- [ ] T063 [US3] Update `AgentListWindow` to reflect live `SessionState`/`ActivityState` changes and add a
+      Dismiss action for ended entries, and update `TrayIconController` to badge agents in an
+      unacknowledged attention-needed state (FR-009), in
+      `src/ClaudeAgentDashboard.Presentation/Views/AgentListWindow.axaml`/`.axaml.cs` and
+      `src/ClaudeAgentDashboard.Presentation/TrayIcon/TrayIconController.cs` (depends on T059, T062;
+      touches the same `AgentListWindow` file as T037/T045 — sequence after them)
+- [ ] T064 [US3] Add a "Set up activity detection" tray menu action calling `IHookRegistrar.RegisterHooks`
+      (the FR-013 one-time setup step) in
+      `src/ClaudeAgentDashboard.Presentation/TrayIcon/TrayIconController.cs` (depends on T058)
+- [ ] T065 [US3] Register `IAgentActivityFeed`, `IHookRegistrar`, and the OS-appropriate `INotifier` in
+      `CompositionRoot`, and start `HookEventListener` at app startup, in
+      `src/ClaudeAgentDashboard.Presentation/CompositionRoot.cs` (depends on T057, T058, T059, T060, T061,
+      T062)
 
-**Checkpoint**: All three user stories are independently functional.
+**Checkpoint**: User Stories 1, 2, and 3 are all independently functional.
 
 ---
 
-## Phase 6: Polish & Cross-Cutting Concerns
+## Phase 6: User Story 4 - See what an agent is currently doing (Priority: P3)
+
+**Goal**: Clicking an agent's list entry (not "Show") opens a detail view, inside the dashboard, with a
+human-readable summary of its current activity, updating live as that activity changes.
+
+**Independent Test**: With hooks registered and an agent running, click its list entry and confirm a
+detail view opens showing its current activity, updating as that activity changes — see quickstart.md
+scenario 4. (Depends on User Story 3's hook infrastructure existing to have any activity content to show,
+per plan.md; the view itself is a separate, independently-addable slice.)
+
+### Tests for User Story 4
+
+> Write this test FIRST, confirm it FAILS, then implement.
+
+- [ ] T066 [P] [US4] Write failing unit test: `ViewAgentActivityQuery` returns the current `ActivityState`
+      and `ActivitySummary` for a session, reflecting the most recently applied `ActivitySignal`, using a
+      faked session store, in
+      `tests/ClaudeAgentDashboard.Application.UnitTests/ViewAgentActivityQueryTests.cs`
+
+### Implementation for User Story 4
+
+- [ ] T067 [US4] Implement `ViewAgentActivityQuery` in
+      `src/ClaudeAgentDashboard.Application/UseCases/ViewAgentActivityQuery.cs`, making T066 pass
+- [ ] T068 [US4] Implement `AgentActivityDetailView` (live-updating activity summary) in
+      `src/ClaudeAgentDashboard.Presentation/Views/AgentActivityDetailView.axaml` and `.axaml.cs` (depends
+      on T067)
+- [ ] T069 [US4] Wire a click on an agent's list entry (distinct from "Show") in `AgentListWindow` to open
+      `AgentActivityDetailView` via `ViewAgentActivityQuery`, in
+      `src/ClaudeAgentDashboard.Presentation/Views/AgentListWindow.axaml`/`.axaml.cs` (depends on T068;
+      touches the same file as T037/T045/T063 — sequence after them)
+
+**Checkpoint**: All four user stories are independently functional.
+
+---
+
+## Phase 7: Polish & Cross-Cutting Concerns
 
 **Purpose**: Improvements that support the feature as a whole without belonging to a single user story.
 
-- [ ] T056 [P] Write failing integration test for `JsonSettingsStore` round-tripping
+- [ ] T070 [P] Write failing integration test for `JsonSettingsStore` round-tripping
       `LaunchAtLoginEnabled` against a real temp file, in
       `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/JsonSettingsStoreTests.cs`
-- [ ] T057 Implement `JsonSettingsStore` in
-      `src/ClaudeAgentDashboard.Infrastructure/Settings/JsonSettingsStore.cs`, making T056 pass (depends
-      on T022)
-- [ ] T058 [P] Register the app as an OS login item (Windows Run registry key / macOS LaunchAgent), gated
+- [ ] T071 Implement `JsonSettingsStore` in
+      `src/ClaudeAgentDashboard.Infrastructure/Settings/JsonSettingsStore.cs`, making T070 pass (depends
+      on T028)
+- [ ] T072 [P] Register the app as an OS login item (Windows Run registry key / macOS LaunchAgent), gated
       by `ISettingsStore.LaunchAtLoginEnabled`, wired in
-      `src/ClaudeAgentDashboard.Presentation/CompositionRoot.cs` (depends on T057)
-- [ ] T059 [P] Run quickstart.md validation end-to-end on Windows and record results in
-      `specs/001-agent-tray-dashboard/quickstart.md`
-- [ ] T060 [P] Run quickstart.md validation end-to-end on macOS and record results in
-      `specs/001-agent-tray-dashboard/quickstart.md`
-- [ ] T061 [P] Review the SonarCloud/coverage report from CI and address any new-code issues surfaced
-- [ ] T062 [P] Update `README.md` with build, run, and architecture overview instructions referencing
-      plan.md
+      `src/ClaudeAgentDashboard.Presentation/CompositionRoot.cs` (depends on T071)
+- [ ] T073 [P] Run quickstart.md validation end-to-end on Windows (all four scenarios plus the
+      skip-hook-setup scenario) and record results in `specs/001-agent-tray-dashboard/quickstart.md`
+- [ ] T074 [P] Run quickstart.md validation end-to-end on macOS (all four scenarios plus the
+      skip-hook-setup scenario) and record results in `specs/001-agent-tray-dashboard/quickstart.md`
+- [ ] T075 [P] Review the SonarCloud/coverage report from CI and address any new-code issues surfaced
+- [ ] T076 [P] Update `README.md` with build, run, hook-setup, and architecture overview instructions
+      referencing plan.md
 
 ---
 
@@ -306,13 +381,16 @@ window — see quickstart.md scenario 3.
 ### Phase Dependencies
 
 - **Setup (T001–T010)**: No dependencies — start immediately; most tasks parallel.
-- **Foundational (T011–T024)**: Depends on Setup completion — BLOCKS all user stories.
-- **User Story 1 (T025–T032)**: Depends on Foundational only.
-- **User Story 2 (T033–T040)**: Depends on Foundational only; independently testable from US1, but T039
-  edits the same `AgentListWindow` file T031 creates, so sequence after it if worked serially.
-- **User Story 3 (T041–T055)**: Depends on Foundational; extends the watchers US1 implements (T028, T029)
-  and the `AgentListWindow` file US1/US2 touch — independently testable, but naturally sequenced last.
-- **Polish (T056–T062)**: Depends on the desired user stories being complete.
+- **Foundational (T011–T030)**: Depends on Setup completion — BLOCKS all user stories.
+- **User Story 1 (T031–T038)**: Depends on Foundational only.
+- **User Story 2 (T039–T046)**: Depends on Foundational only; independently testable from US1, but T045
+  edits the same `AgentListWindow` file T037 creates, so sequence after it if worked serially.
+- **User Story 3 (T047–T065)**: Depends on Foundational; extends the watchers US1 implements (T034, T035)
+  and the `AgentListWindow`/`TrayIconController` files earlier stories touch — independently testable per
+  its own acceptance scenarios, but naturally sequenced after US1/US2.
+- **User Story 4 (T066–T069)**: Depends on Foundational directly, and in practice on User Story 3's hook
+  pipeline (T057–T065) to have any `ActivitySummary` content to display — sequenced last among the stories.
+- **Polish (T070–T076)**: Depends on the desired user stories being complete.
 
 ### Within Each User Story
 
@@ -323,26 +401,30 @@ window — see quickstart.md scenario 3.
 ### Parallel Opportunities
 
 - Setup: T002–T006, T008–T010 in parallel.
-- Foundational: T011–T014 in parallel; T015, T017–T022 in parallel; T016 depends on T015; T018 depends on
-  T016.
+- Foundational: T011–T014 in parallel; T015–T019 in parallel; T021, T022 in parallel; T023–T028 in
+  parallel; T020 depends on T015/T016/T019.
 - Per user story, the Windows and macOS integration tests/implementations are different files and can run
-  in parallel (e.g., T025 ∥ T026; T036 ∥ T037; T041 ∥ T042 ∥ T043 ∥ T044).
+  in parallel (e.g., T031 ∥ T032; T039 ∥ T040; T047 ∥ T048; T052 ∥ T053).
+- Within User Story 3, T049–T054 (six independent test files) can all be written in parallel before any
+  implementation begins.
 - Different user stories can be staffed in parallel once Foundational is complete, keeping in mind the
-  shared-file sequencing note on `AgentListWindow` above.
+  shared-file sequencing notes on `AgentListWindow`/`TrayIconController` above.
 
 ---
 
-## Parallel Example: User Story 1
+## Parallel Example: User Story 3
 
 ```bash
-# Launch all US1 tests together:
-Task: "Integration test WindowsProcessAgentWatcher detection in tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/WindowsProcessAgentWatcherTests.cs"
-Task: "Integration test MacProcessAgentWatcher detection in tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/MacProcessAgentWatcherTests.cs"
-Task: "Unit test OpenDashboardQuery in tests/ClaudeAgentDashboard.Application.UnitTests/OpenDashboardQueryTests.cs"
+# Launch all US3 test-writing together:
+Task: "Integration test WindowsProcessAgentWatcher SessionEnded in tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/WindowsProcessAgentWatcherTests.cs"
+Task: "Integration test MacProcessAgentWatcher SessionEnded in tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/MacProcessAgentWatcherTests.cs"
+Task: "Integration test HookEventListener payload parsing in tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/HookEventListenerTests.cs"
+Task: "Integration test ClaudeCodeHookRegistrar idempotent write in tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/ClaudeCodeHookRegistrarTests.cs"
+Task: "Unit test ApplyActivitySignalCommand correlation + notify-decision in tests/ClaudeAgentDashboard.Application.UnitTests/ApplyActivitySignalCommandTests.cs"
 
-# Then the two per-OS watcher implementations together:
-Task: "Implement WindowsProcessAgentWatcher in src/ClaudeAgentDashboard.Infrastructure/Windows/WindowsProcessAgentWatcher.cs"
-Task: "Implement MacProcessAgentWatcher in src/ClaudeAgentDashboard.Infrastructure/MacOS/MacProcessAgentWatcher.cs"
+# Then the notifier implementations together:
+Task: "Implement WindowsToastNotifier in src/ClaudeAgentDashboard.Infrastructure/Windows/WindowsToastNotifier.cs"
+Task: "Implement MacUserNotifier in src/ClaudeAgentDashboard.Infrastructure/MacOS/MacUserNotifier.cs"
 ```
 
 ---
@@ -355,15 +437,17 @@ Task: "Implement MacProcessAgentWatcher in src/ClaudeAgentDashboard.Infrastructu
 2. Complete Phase 2: Foundational (blocks all stories).
 3. Complete Phase 3: User Story 1.
 4. **STOP and VALIDATE**: run quickstart.md scenario 1 independently.
-5. Demo: a working "see all running agents" tray app.
+5. Demo: a working "see all detected agents" tray app.
 
 ### Incremental Delivery
 
 1. Setup + Foundational → foundation ready.
 2. User Story 1 → validate → demo (MVP).
 3. User Story 2 → validate → demo (can now jump to any agent's window).
-4. User Story 3 → validate → demo (full notify-and-focus loop).
-5. Polish → login-item registration, cross-platform validation sign-off, README.
+4. User Story 3 → validate → demo (the full "notify me only when it needs me" loop — the heart of this
+   revision).
+5. User Story 4 → validate → demo (per-agent activity detail view).
+6. Polish → login-item registration, cross-platform validation sign-off, README.
 
 ---
 
