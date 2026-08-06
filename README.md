@@ -49,6 +49,13 @@ which merges hook commands into your Claude Code `settings.json` — see
 Skipping this still gives you the agent cards and window-focusing;
 activity just shows as `Unknown`.
 
+**Any Claude Code session already running when you do this stays
+`Unknown` until you restart it.** Claude Code reads its hook
+configuration once, at session start, and never re-reads it mid-session
+(a deliberate security measure on Claude Code's part) — so registering
+hooks doesn't retroactively apply to sessions that were already open.
+Only sessions started *after* setup will report activity.
+
 ## Architecture
 
 Four-layer Clean Architecture, enforced by an automated architecture test

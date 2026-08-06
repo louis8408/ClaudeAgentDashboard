@@ -353,6 +353,34 @@ level.)
     synthetic payload); the `transcript_path` field's presence/shape in
     genuine Claude Code hook traffic is assumed from the wire contract,
     not confirmed against a live Claude Code hook invocation.
+- **Important follow-up finding, same day**: after all of the above, the
+  live dashboard still showed this session's own agent as `Unknown` —
+  including after several more real tool calls, which should have fired
+  real `PreToolUse` hooks if anything was reaching the listener. Added
+  temporary request logging to `HookEventListener` (removed afterward) and
+  confirmed **zero requests arrived** from real tool-call activity in this
+  session, despite the listener genuinely working (proven moments earlier
+  via `curl`-based synthetic payloads) and `AreHooksRegistered()` reporting
+  `true`. Root cause, confirmed via Claude Code's own public issue tracker
+  (not guessed): **Claude Code snapshots its hook configuration once, at
+  session start, and does not re-read it mid-session** — a deliberate
+  security measure, not a bug on either side. This session's hooks were
+  registered mid-conversation, long after the session itself started, so
+  its snapshot never included them; no amount of waiting or activity will
+  ever make it report status without a restart. This is a *different*
+  failure mode from the correlation bug fixed above — both are real, and
+  the app can't tell from the outside which one applies to a given
+  `Unknown` session, so `AgentDetailOverlay`'s guidance text was corrected
+  again to mention both explicitly (a session's own restart status can't
+  be introspected, only ruled in/out by trying it).
+  - **Not independently re-verified**: this specific dashboard session's
+    own status was never confirmed to start correctly reporting after an
+    actual restart, since restarting this conversation's own CLI session
+    was not something achievable mid-conversation. The Claude Code issue
+    tracker finding is treated as sufficient evidence for the mechanism,
+    but the dashboard's specific behavior after a real restart — as
+    opposed to a synthetic signal — should get one real pass before
+    considering FR-013/FR-018 fully closed.
 
 ### macOS — not executed
 

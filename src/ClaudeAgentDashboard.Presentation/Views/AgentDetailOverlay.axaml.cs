@@ -106,15 +106,18 @@ public partial class AgentDetailOverlay : UserControl
 
         if (_hookRegistrar.AreHooksRegistered())
         {
-            // Not "restart the session" — that doesn't fix a correlation mismatch (only
-            // WindowsWorkingDirectoryResolver/R15 does), and restarting is not actually what's
-            // needed once hooks are registered: a matching signal just hasn't arrived yet, or
-            // this session's working directory couldn't be resolved (spec edge case) and it's
-            // relying on the weaker label-based fallback, which may never match.
+            // Claude Code snapshots hook configuration at session start and never re-reads it
+            // mid-session (a deliberate security measure, not a bug on either side) — so a
+            // session already running when "Set up activity detection…" was clicked will never
+            // report activity no matter how long it runs; restarting it is the actual fix in
+            // that case. If a session started *after* setup is still stuck Unknown, the more
+            // likely cause is this app's own working-directory resolution failing for it
+            // (WindowsWorkingDirectoryResolver/R15) — restarting that one won't help.
             HookSetupExplanationText.Text =
-                "Activity detection is set up. If this stays Unknown for a while after the agent " +
-                "does something, this session's directory may not have been resolved — status may " +
-                "stay unavailable for it specifically, without affecting other agents.";
+                "Activity detection is set up, but this session may have started before that — " +
+                "Claude Code only reads hook configuration once, at startup, so restarting this " +
+                "session is usually what's needed. If a session started after setup is still stuck " +
+                "here, its working directory likely couldn't be resolved instead.";
             SetUpHooksButton.IsVisible = false;
         }
         else

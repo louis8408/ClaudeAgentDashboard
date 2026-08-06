@@ -539,6 +539,18 @@ constitution.
 - [X] T110 [P] Update `README.md`'s "Known gaps" — the hook-to-session correlation bullet no longer
       applies on Windows now that T100 is in place; note macOS's T101 equivalent remains unverified on
       real hardware
+- [X] T111 Diagnose and document a second, distinct cause of `Unknown` activity found while dogfooding
+      T091–T110's own fix: this session's own agent stayed `Unknown` despite hooks being registered and
+      the correlation fix being in place. Added temporary request logging to `HookEventListener` (removed
+      after diagnosis) and confirmed zero real requests arrived from real tool-call activity, despite the
+      listener working correctly for synthetic `curl` payloads. Root cause (confirmed via Claude Code's
+      own public issue tracker, not guessed): Claude Code snapshots hook configuration once at session
+      start and never re-reads it mid-session — a deliberate security measure. Corrected
+      `AgentDetailOverlay`'s "hooks already registered" guidance text a second time to mention both real
+      causes (this session predates registration → restart it; a session that postdates registration is
+      still stuck → likely a working-directory resolution failure instead), since the app cannot tell
+      which applies to a given session from the outside. Documented in `README.md`'s setup section and
+      `quickstart.md`'s validation log. Presentation task, no preceding test per constitution v1.1.0
 
 **Checkpoint**: Activity detection works correctly for the ordinary case on Windows; the detail overlay
 shows read-only transcript content.
