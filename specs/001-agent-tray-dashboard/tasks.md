@@ -384,23 +384,23 @@ per plan.md; the view itself is a separate, independently-addable slice.)
 
 **Purpose**: Improvements that support the feature as a whole without belonging to a single user story.
 
-- [ ] T072 [P] Write failing integration test for `JsonSettingsStore` round-tripping
+- [X] T072 [P] Write failing integration test for `JsonSettingsStore` round-tripping
       `LaunchAtLoginEnabled` against a real temp file, in
       `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/JsonSettingsStoreTests.cs`
-- [ ] T073 Implement `JsonSettingsStore` in
+- [X] T073 Implement `JsonSettingsStore` in
       `src/ClaudeAgentDashboard.Infrastructure/Settings/JsonSettingsStore.cs`, making T072 pass (depends
       on T028)
-- [ ] T074 [P] Register the app as an OS login item (Windows Run registry key / macOS LaunchAgent), gated
+- [X] T074 [P] Register the app as an OS login item (Windows Run registry key / macOS LaunchAgent), gated
       by `ISettingsStore.LaunchAtLoginEnabled`, wired in
       `src/ClaudeAgentDashboard.Presentation/CompositionRoot.cs` (depends on T073)
-- [ ] T075 [P] Run quickstart.md validation end-to-end on Windows — all four user-story scenarios, the
+- [X] T075 [P] Run quickstart.md validation end-to-end on Windows — all four user-story scenarios, the
       skip-hook-setup scenario, **and the idle resource-footprint check (SC-006)** — and record results in
       `specs/001-agent-tray-dashboard/quickstart.md` (C1: SC-006 previously had no validation step at all)
-- [ ] T076 [P] Run quickstart.md validation end-to-end on macOS — all four user-story scenarios, the
+- [X] T076 [P] Run quickstart.md validation end-to-end on macOS — all four user-story scenarios, the
       skip-hook-setup scenario, **and the idle resource-footprint check (SC-006)** — and record results in
       `specs/001-agent-tray-dashboard/quickstart.md` (C1)
-- [ ] T077 [P] Review the SonarCloud/coverage report from CI and address any new-code issues surfaced
-- [ ] T078 [P] Update `README.md` with build, run, hook-setup, and architecture overview instructions
+- [X] T077 [P] Review the SonarCloud/coverage report from CI and address any new-code issues surfaced
+- [X] T078 [P] Update `README.md` with build, run, hook-setup, and architecture overview instructions
       referencing plan.md
 
 ---

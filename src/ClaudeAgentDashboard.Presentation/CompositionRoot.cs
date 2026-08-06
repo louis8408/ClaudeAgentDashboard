@@ -4,6 +4,7 @@ using ClaudeAgentDashboard.Application.UseCases;
 using ClaudeAgentDashboard.Domain.Ports;
 using ClaudeAgentDashboard.Infrastructure.Hooks;
 using ClaudeAgentDashboard.Infrastructure.MacOS;
+using ClaudeAgentDashboard.Infrastructure.Settings;
 using ClaudeAgentDashboard.Infrastructure.Windows;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -48,10 +49,31 @@ public static class CompositionRoot
         services.AddSingleton<HandleNotificationActivatedCommand>();
         services.AddSingleton<DismissAgentCommand>();
         services.AddSingleton<ViewAgentActivityQuery>();
+        services.AddSingleton<ISettingsStore, JsonSettingsStore>();
 
         var provider = services.BuildServiceProvider();
         WireEventSubscriptions(provider);
+        ApplyLoginItemSetting(provider);
         return provider;
+    }
+
+    /// <summary>
+    /// Syncs the OS login-item registration to the persisted setting on every startup
+    /// (default: disabled — see JsonSettingsStore's doc comment for why). A no-op in the
+    /// common case where the setting is already off and nothing was ever registered.
+    /// </summary>
+    private static void ApplyLoginItemSetting(IServiceProvider provider)
+    {
+        var enabled = provider.GetRequiredService<ISettingsStore>().LaunchAtLoginEnabled;
+
+        if (OperatingSystem.IsWindows())
+        {
+            new WindowsLoginItemRegistrar().SetEnabled(enabled);
+        }
+        else if (OperatingSystem.IsMacOS())
+        {
+            new MacLoginItemRegistrar().SetEnabled(enabled);
+        }
     }
 
     /// <summary>

@@ -127,8 +127,7 @@ hooks) still work.
 
 ## Automated coverage
 
-These scenarios are backed by (see tasks.md once regenerated for this
-revision):
+These scenarios are backed by tasks.md's test suite:
 
 - **Unit tests** against Application use cases with `IAgentWatcher`,
   `IAgentActivityFeed`, `IWindowFocuser`, and `INotifier` faked.
@@ -138,3 +137,56 @@ revision):
 - **Architecture tests** (`NetArchTest.Rules`) asserting the Domain layer
   has no outward dependencies and Infrastructure is only referenced from
   the composition root, per the constitution.
+
+## Validation Log
+
+### Windows — 2026-08-06
+
+Machine: Windows 11 Pro, build 10.0.26200 (an Insider/Canary-channel
+build number, notably ahead of any current stable release).
+
+- **T075 (Windows)**: Ran the full automated suite (68 passing, 9
+  correctly skipped macOS-only tests) plus a series of manual app
+  launches. The app builds, starts, stays resident, and shuts down
+  cleanly every time; the hook listener genuinely binds and listens on
+  `127.0.0.1:51820` (netstat-verified); `Win32WindowFocuser` was verified
+  against a real window (minimize → Focus → restored, via
+  `Win32WindowFocuserTests`); `WindowsToastNotifier` delivers real toasts
+  for all three `AttentionReason`s (verified via `WindowsToastNotifierTests`,
+  plus the `Setting.Enabled` check).
+- **Finding — tray icon does not render visually on this machine**: the
+  icon is never visible in the main tray or the overflow flyout, on any
+  icon file tried. Diagnosed thoroughly, not just observed once:
+  - Debug logging confirmed the full Avalonia-side path succeeds every
+    time (`AssetLoader.Open` → `WindowIcon` construction → `TrayIcon.SetIcons`
+    → `TrayIcon.GetIcons` count = 1).
+  - Windows *does* register the icon — a `HKCU\Control Panel\NotifyIconSettings`
+    entry appears with the correct exe path — but its cached `IconSnapshot`
+    decodes to a fully transparent 32×32 image (verified by rendering it
+    against a magenta background: solid magenta, zero content).
+  - Ruled out the icon file as the cause: replaced it with
+    `System.Drawing.SystemIcons.Application` (a known-good, real Windows
+    icon) and got the identical blank-snapshot result.
+  - Ruled out stale shell state: restarted `explorer.exe` between attempts;
+    same result both before and after.
+  - This isolates the problem to Avalonia's Win32 tray-icon rendering (or
+    Shell_NotifyIcon's icon handling) specifically on this build, not to
+    application code or the icon asset. **Needs re-validation on a
+    standard/stable Windows release** before concluding FR-001/FR-009's
+    tray-icon visibility genuinely works end-to-end; everything
+    downstream of "the icon is clickable" (list, Show, Dismiss, detail
+    view, notifications) is validated independently via the automated
+    suite and does not depend on this rendering path.
+- **T075 (SC-006 idle check)**: idle memory ~110–120MB, no sustained CPU
+  observed at rest across multiple runs; no perceptible slowdown to other
+  applications. Not measured with a profiler — Task Manager-level
+  observation only.
+
+### macOS — not executed
+
+**T076 was not run.** No macOS hardware was available in this session.
+The macOS-specific code (`MacProcessAgentWatcher`, `MacWindowFocuser`,
+`MacUserNotifier`, `MacLoginItemRegistrar`) compiles and its tests are
+correctly skip-guarded, but none of it has been executed on a real Mac.
+In particular, `MacUserNotifier.NotificationActivated` is a documented,
+known gap (see its class-level doc comment) independent of this.

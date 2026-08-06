@@ -49,6 +49,7 @@ public sealed class TrayIconController : IDisposable
             Icon = new WindowIcon(AssetLoader.Open(new Uri(IconResourceUri))),
             ToolTipText = DefaultTooltip,
             Menu = menu,
+            IsVisible = true,
         };
         _trayIcon.Clicked += OnTrayIconClicked;
 
