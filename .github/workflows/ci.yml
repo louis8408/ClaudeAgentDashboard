@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore ClaudeAgentDashboard.sln
+
+      - name: Build
+        run: dotnet build ClaudeAgentDashboard.sln --no-restore --configuration Release
+
+      - name: Test with coverage
+        run: >
+          dotnet test ClaudeAgentDashboard.sln --no-build --configuration Release
+          --collect:"XPlat Code Coverage"
+          --settings coverlet.runsettings
+          --results-directory ./coverage
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.os }}
+          path: ./coverage
+
+  sonar-scan:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Setup Java (required by SonarScanner)
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Install SonarScanner for .NET
+        run: dotnet tool install --global dotnet-sonarscanner
+
+      - name: Sonar begin
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: >
+          dotnet-sonarscanner begin
+          /k:"louis8408_ClaudeAgentDashboard"
+          /o:"louis8408"
+          /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+          /d:sonar.host.url="https://sonarcloud.io"
+
+      - name: Restore & Build
+        run: |
+          dotnet restore ClaudeAgentDashboard.sln
+          dotnet build ClaudeAgentDashboard.sln --no-restore --configuration Release
+
+      - name: Sonar end
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"

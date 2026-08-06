@@ -51,32 +51,32 @@ tests/ClaudeAgentDashboard.Architecture.Tests/
 
 **Purpose**: Project initialization and CI/analysis wiring, ahead of any feature code.
 
-- [ ] T001 Create the four `src/` projects and four `tests/` projects listed in plan.md's Project
+- [X] T001 Create the four `src/` projects and four `tests/` projects listed in plan.md's Project
       Structure, and update `ClaudeAgentDashboard.sln` to reference all eight, removing the placeholder
       `ClaudeAgentDashboard\ClaudeAgentDashboard.csproj` stub reference left over from initial scaffolding
-- [ ] T002 [P] Initialize `src/ClaudeAgentDashboard.Domain/ClaudeAgentDashboard.Domain.csproj` as a net8.0
+- [X] T002 [P] Initialize `src/ClaudeAgentDashboard.Domain/ClaudeAgentDashboard.Domain.csproj` as a net8.0
       class library with zero external package references
-- [ ] T003 [P] Initialize `src/ClaudeAgentDashboard.Application/ClaudeAgentDashboard.Application.csproj` as
+- [X] T003 [P] Initialize `src/ClaudeAgentDashboard.Application/ClaudeAgentDashboard.Application.csproj` as
       a net8.0 class library referencing `ClaudeAgentDashboard.Domain`
-- [ ] T004 [P] Initialize `src/ClaudeAgentDashboard.Infrastructure/ClaudeAgentDashboard.Infrastructure.csproj`
+- [X] T004 [P] Initialize `src/ClaudeAgentDashboard.Infrastructure/ClaudeAgentDashboard.Infrastructure.csproj`
       as a net8.0 class library referencing `ClaudeAgentDashboard.Domain` and `ClaudeAgentDashboard.Application`
       (the hook listener uses the built-in `System.Net.HttpListener` — no extra package needed, per
       research.md R9)
-- [ ] T005 [P] Initialize `src/ClaudeAgentDashboard.Presentation/ClaudeAgentDashboard.Presentation.csproj` as
+- [X] T005 [P] Initialize `src/ClaudeAgentDashboard.Presentation/ClaudeAgentDashboard.Presentation.csproj` as
       an Avalonia net8.0 desktop application referencing all three layers, with `Avalonia` and
       `Avalonia.Desktop` package references
-- [ ] T006 [P] Initialize `tests/ClaudeAgentDashboard.Domain.UnitTests`,
+- [X] T006 [P] Initialize `tests/ClaudeAgentDashboard.Domain.UnitTests`,
       `tests/ClaudeAgentDashboard.Application.UnitTests`,
       `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests`, and
       `tests/ClaudeAgentDashboard.Architecture.Tests` as xUnit net8.0 projects, each referencing its
       corresponding `src/` project (`Architecture.Tests` references all four `src/` projects)
-- [ ] T007 Add the `NetArchTest.Rules` package to `tests/ClaudeAgentDashboard.Architecture.Tests` and the
+- [X] T007 Add the `NetArchTest.Rules` package to `tests/ClaudeAgentDashboard.Architecture.Tests` and the
       `coverlet.collector` package to all four test projects
-- [ ] T008 [P] Add `Directory.Build.props` at the repo root wiring `SonarAnalyzer.CSharp` as a build-time
+- [X] T008 [P] Add `Directory.Build.props` at the repo root wiring `SonarAnalyzer.CSharp` as a build-time
       analyzer with `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` for new code
-- [ ] T009 [P] Add `sonar-project.properties` at the repo root configuring the SonarCloud project key and
+- [X] T009 [P] Add `sonar-project.properties` at the repo root configuring the SonarCloud project key and
       `src`/`tests` paths
-- [ ] T010 [P] Add `.github/workflows/ci.yml` building `ClaudeAgentDashboard.sln`, running all four test
+- [X] T010 [P] Add `.github/workflows/ci.yml` building `ClaudeAgentDashboard.sln`, running all four test
       projects with `coverlet` coverage, and executing the SonarCloud scan
 
 ---
@@ -88,55 +88,55 @@ user story builds on.
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T011 [P] Write architecture tests asserting Domain has zero outward dependencies, Application depends
+- [X] T011 [P] Write architecture tests asserting Domain has zero outward dependencies, Application depends
       only on Domain, and Infrastructure implementations (including the `Hooks` subfolder) are referenced
       only from Presentation, in `tests/ClaudeAgentDashboard.Architecture.Tests/LayeringTests.cs` (these act
       as regression guards from this point forward — they pass trivially now and must keep passing as later
       phases add code)
-- [ ] T012 [P] Write failing unit tests for `AgentSession`: construction; the `SessionState`
+- [X] T012 [P] Write failing unit tests for `AgentSession`: construction; the `SessionState`
       `Running → Ended` transition and `EndedAt` invariant; `ApplySignal(ActivitySignal)` mapping each
       `HookEvent` to the correct `ActivityState` (`UserPromptSubmit`/`PreToolUse` → `Working`, `Stop` →
       `Idle`, `Notification` → `WaitingForInput`, `SessionEnd` → forces `SessionState = Ended`); and the
       newest-timestamp-wins guard against out-of-order signals (spec edge case), in
       `tests/ClaudeAgentDashboard.Domain.UnitTests/AgentSessionTests.cs`
-- [ ] T013 [P] Write failing unit tests for `TerminalWindowReference`'s one-way `IsResolvable` transition in
+- [X] T013 [P] Write failing unit tests for `TerminalWindowReference`'s one-way `IsResolvable` transition in
       `tests/ClaudeAgentDashboard.Domain.UnitTests/TerminalWindowReferenceTests.cs`
-- [ ] T014 [P] Write failing unit tests for `AttentionNotification` construction and its
+- [X] T014 [P] Write failing unit tests for `AttentionNotification` construction and its
       `AgentSessionId`/`Reason` linkage in
       `tests/ClaudeAgentDashboard.Domain.UnitTests/AttentionNotificationTests.cs`
-- [ ] T015 [P] Implement the `SessionState` enum (`Running`, `Ended`) in
+- [X] T015 [P] Implement the `SessionState` enum (`Running`, `Ended`) in
       `src/ClaudeAgentDashboard.Domain/SessionState.cs`
-- [ ] T016 [P] Implement the `ActivityState` enum (`Unknown`, `Working`, `Idle`, `WaitingForInput`) in
+- [X] T016 [P] Implement the `ActivityState` enum (`Unknown`, `Working`, `Idle`, `WaitingForInput`) in
       `src/ClaudeAgentDashboard.Domain/ActivityState.cs`
-- [ ] T017 [P] Implement the `HookEvent` enum (`UserPromptSubmit`, `PreToolUse`, `Stop`, `Notification`,
+- [X] T017 [P] Implement the `HookEvent` enum (`UserPromptSubmit`, `PreToolUse`, `Stop`, `Notification`,
       `SessionEnd`) in `src/ClaudeAgentDashboard.Domain/HookEvent.cs`
-- [ ] T018 [P] Implement the `AttentionReason` enum (`Idle`, `WaitingForInput`, `Ended`) in
+- [X] T018 [P] Implement the `AttentionReason` enum (`Idle`, `WaitingForInput`, `Ended`) in
       `src/ClaudeAgentDashboard.Domain/AttentionReason.cs`
-- [ ] T019 [P] Implement the `ActivitySignal` type (correlation key, `HookEvent`, `OccurredAt`,
+- [X] T019 [P] Implement the `ActivitySignal` type (correlation key, `HookEvent`, `OccurredAt`,
       `SummaryText`) in `src/ClaudeAgentDashboard.Domain/ActivitySignal.cs` (depends on T017)
-- [ ] T020 Implement the `AgentSession` entity, including `ApplySignal`, in
+- [X] T020 Implement the `AgentSession` entity, including `ApplySignal`, in
       `src/ClaudeAgentDashboard.Domain/AgentSession.cs`, making T012 pass (depends on T015, T016, T019)
-- [ ] T021 [P] Implement the `TerminalWindowReference` entity in
+- [X] T021 [P] Implement the `TerminalWindowReference` entity in
       `src/ClaudeAgentDashboard.Domain/TerminalWindowReference.cs`, making T013 pass
-- [ ] T022 [P] Implement the `AttentionNotification` entity in
+- [X] T022 [P] Implement the `AttentionNotification` entity in
       `src/ClaudeAgentDashboard.Domain/AttentionNotification.cs`, making T014 pass (depends on T018)
-- [ ] T023 [P] Define the `IAgentWatcher` port (`GetCurrentSessions`, `SessionStarted`, `SessionEnded`) in
+- [X] T023 [P] Define the `IAgentWatcher` port (`GetCurrentSessions`, `SessionStarted`, `SessionEnded`) in
       `src/ClaudeAgentDashboard.Domain/Ports/IAgentWatcher.cs`
-- [ ] T024 [P] Define the `IAgentActivityFeed` port (`SignalReceived`) in
+- [X] T024 [P] Define the `IAgentActivityFeed` port (`SignalReceived`) in
       `src/ClaudeAgentDashboard.Domain/Ports/IAgentActivityFeed.cs`
-- [ ] T025 [P] Define the `IWindowFocuser` port and `FocusResult` type in
+- [X] T025 [P] Define the `IWindowFocuser` port and `FocusResult` type in
       `src/ClaudeAgentDashboard.Domain/Ports/IWindowFocuser.cs`
-- [ ] T026 [P] Define the `INotifier` port (`NotifyAttention`, `NotificationActivated`) in
+- [X] T026 [P] Define the `INotifier` port (`NotifyAttention`, `NotificationActivated`) in
       `src/ClaudeAgentDashboard.Domain/Ports/INotifier.cs`
-- [ ] T027 [P] Define the `IHookRegistrar` port (`AreHooksRegistered`, `RegisterHooks`) in
+- [X] T027 [P] Define the `IHookRegistrar` port (`AreHooksRegistered`, `RegisterHooks`) in
       `src/ClaudeAgentDashboard.Domain/Ports/IHookRegistrar.cs`
-- [ ] T028 [P] Define the `ISettingsStore` port in `src/ClaudeAgentDashboard.Domain/Ports/ISettingsStore.cs`
-- [ ] T029 Implement the Avalonia application shell and composition root —
+- [X] T028 [P] Define the `ISettingsStore` port in `src/ClaudeAgentDashboard.Domain/Ports/ISettingsStore.cs`
+- [X] T029 Implement the Avalonia application shell and composition root —
       `src/ClaudeAgentDashboard.Presentation/Program.cs`, `App.axaml`/`App.axaml.cs`, and
       `src/ClaudeAgentDashboard.Presentation/CompositionRoot.cs` with OS-conditional DI registration stubs
       for all six ports (depends on T023–T028) — Presentation task, no preceding test per constitution
       v1.1.0 Principle II/III
-- [ ] T030 Implement `TrayIconController` showing a persistent tray/menu-bar icon with a Quit action, in
+- [X] T030 Implement `TrayIconController` showing a persistent tray/menu-bar icon with a Quit action, in
       `src/ClaudeAgentDashboard.Presentation/TrayIcon/TrayIconController.cs` (depends on T029) — satisfies
       the baseline "always-present icon" requirement (FR-001) all stories build on; Presentation task, no
       preceding test per constitution v1.1.0
