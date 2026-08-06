@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using ClaudeAgentDashboard.Application.UseCases;
+using ClaudeAgentDashboard.Domain.Ports;
 using ClaudeAgentDashboard.Presentation.Views;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -32,7 +33,10 @@ public partial class App : Avalonia.Application
             // Tray-only app (FR-001): no window at startup, and the process
             // must not exit just because no window is currently open.
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            _trayIconController = new TrayIcon.TrayIconController();
+            _trayIconController = new TrayIcon.TrayIconController(
+                Services.GetRequiredService<OpenDashboardQuery>(),
+                Services.GetRequiredService<IHookRegistrar>(),
+                Services.GetRequiredService<HookListenerAddress>().Value);
             _trayIconController.DashboardRequested += (_, _) => OpenDashboard();
             desktop.Exit += (_, _) => _trayIconController?.Dispose();
         }
@@ -42,9 +46,10 @@ public partial class App : Avalonia.Application
 
     private void OpenDashboard()
     {
-        var sessions = Services.GetRequiredService<OpenDashboardQuery>().Execute();
+        var openDashboardQuery = Services.GetRequiredService<OpenDashboardQuery>();
         var showAgentCommand = Services.GetRequiredService<ShowAgentCommand>();
-        var window = new AgentListWindow(sessions, showAgentCommand);
+        var dismissAgentCommand = Services.GetRequiredService<DismissAgentCommand>();
+        var window = new AgentListWindow(openDashboardQuery, showAgentCommand, dismissAgentCommand);
         window.Show();
         window.Activate();
     }

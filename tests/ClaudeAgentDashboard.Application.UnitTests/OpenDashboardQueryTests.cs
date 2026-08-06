@@ -7,12 +7,12 @@ namespace ClaudeAgentDashboard.Application.UnitTests;
 public class OpenDashboardQueryTests
 {
     [Fact]
-    public void Execute_Returns_All_Sessions_From_The_Watcher()
+    public void Execute_Returns_All_Sessions_From_The_Registry()
     {
         var running = new AgentSession(Guid.NewGuid(), "already-running", DateTimeOffset.UtcNow, new TerminalWindowReference(1));
         var started = new AgentSession(Guid.NewGuid(), "newly-started", DateTimeOffset.UtcNow, new TerminalWindowReference(2));
-        var watcher = new FakeAgentWatcher([running, started]);
-        var query = new OpenDashboardQuery(watcher);
+        var registry = new AgentSessionRegistry(new FakeAgentWatcher([running, started]));
+        var query = new OpenDashboardQuery(registry);
 
         var result = query.Execute();
 
@@ -24,8 +24,8 @@ public class OpenDashboardQueryTests
     [Fact]
     public void Execute_Returns_Empty_When_No_Agents_Are_Running()
     {
-        var watcher = new FakeAgentWatcher([]);
-        var query = new OpenDashboardQuery(watcher);
+        var registry = new AgentSessionRegistry(new FakeAgentWatcher([]));
+        var query = new OpenDashboardQuery(registry);
 
         var result = query.Execute();
 

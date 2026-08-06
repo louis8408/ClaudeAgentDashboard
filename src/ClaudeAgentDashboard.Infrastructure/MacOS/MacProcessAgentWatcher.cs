@@ -19,29 +19,28 @@ public sealed class MacProcessAgentWatcher : IAgentWatcher, IDisposable
     private readonly Timer _timer;
 
     public event Action<AgentSession>? SessionStarted;
-
-    // Wired up when User Story 3 (T057) extends this class with exit-polling —
-    // deliberately unraised until then.
-#pragma warning disable CS0067
     public event Action<AgentSession>? SessionEnded;
-#pragma warning restore CS0067
 
     public MacProcessAgentWatcher()
     {
         // Initial synchronous scan so already-running agents (FR-010) are visible to
         // GetCurrentSessions() immediately, without waiting for the first timer tick,
         // and without firing SessionStarted for sessions that predate this watcher.
-        Scan(raiseStartedEvents: false);
+        Scan(raiseEvents: false);
 
-        _timer = new Timer(_ => Scan(raiseStartedEvents: true), state: null, PollInterval, PollInterval);
+        _timer = new Timer(_ => Scan(raiseEvents: true), state: null, PollInterval, PollInterval);
     }
 
     public IReadOnlyCollection<AgentSession> GetCurrentSessions() => [.. _sessions.Values];
 
-    private void Scan(bool raiseStartedEvents)
+    private void Scan(bool raiseEvents)
     {
+        var matchedProcessIds = new HashSet<int>();
+
         foreach (var (processId, label) in QueryMatchingProcesses())
         {
+            matchedProcessIds.Add(processId);
+
             if (_sessions.ContainsKey(processId))
             {
                 continue;
@@ -49,9 +48,21 @@ public sealed class MacProcessAgentWatcher : IAgentWatcher, IDisposable
 
             var session = new AgentSession(Guid.NewGuid(), label, DateTimeOffset.UtcNow, new TerminalWindowReference(processId));
 
-            if (_sessions.TryAdd(processId, session) && raiseStartedEvents)
+            if (_sessions.TryAdd(processId, session) && raiseEvents)
             {
                 SessionStarted?.Invoke(session);
+            }
+        }
+
+        foreach (var (processId, session) in _sessions)
+        {
+            if (session.SessionState == SessionState.Running && !matchedProcessIds.Contains(processId))
+            {
+                session.End(DateTimeOffset.UtcNow);
+                if (raiseEvents)
+                {
+                    SessionEnded?.Invoke(session);
+                }
             }
         }
     }

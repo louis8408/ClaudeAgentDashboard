@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using ClaudeAgentDashboard.Application.UseCases;
 using ClaudeAgentDashboard.Domain;
 using ClaudeAgentDashboard.Domain.Ports;
@@ -10,21 +11,39 @@ namespace ClaudeAgentDashboard.Presentation.Views;
 /// User Story 1: lists every currently detected agent with its status, or an empty state.
 /// User Story 2: each entry's "Show" button focuses that agent's terminal window, informing
 /// the user instead of failing silently if it is no longer available (FR-011).
+/// User Story 3: status reflects live changes while the window is open, and ended entries
+/// can be dismissed (FR-012).
 /// </summary>
 public partial class AgentListWindow : Window
 {
+    private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(2);
+
+    private readonly OpenDashboardQuery? _openDashboardQuery;
     private readonly ShowAgentCommand _showAgentCommand;
+    private readonly DismissAgentCommand? _dismissAgentCommand;
+    private readonly DispatcherTimer? _refreshTimer;
 
     public AgentListWindow()
-        : this([], new ShowAgentCommand(new UnavailableWindowFocuser()))
+        : this(null, new ShowAgentCommand(new UnavailableWindowFocuser()), null)
     {
     }
 
-    public AgentListWindow(IReadOnlyCollection<AgentSession> sessions, ShowAgentCommand showAgentCommand)
+    public AgentListWindow(OpenDashboardQuery? openDashboardQuery, ShowAgentCommand showAgentCommand, DismissAgentCommand? dismissAgentCommand)
     {
+        _openDashboardQuery = openDashboardQuery;
         _showAgentCommand = showAgentCommand;
+        _dismissAgentCommand = dismissAgentCommand;
+
         InitializeComponent();
-        Render(sessions);
+        Render(openDashboardQuery?.Execute() ?? []);
+
+        if (openDashboardQuery is not null)
+        {
+            _refreshTimer = new DispatcherTimer { Interval = RefreshInterval };
+            _refreshTimer.Tick += (_, _) => Render(openDashboardQuery.Execute());
+            _refreshTimer.Start();
+            Closed += (_, _) => _refreshTimer.Stop();
+        }
     }
 
     private void Render(IReadOnlyCollection<AgentSession> sessions)
@@ -44,7 +63,22 @@ public partial class AgentListWindow : Window
         }
 
         var result = _showAgentCommand.Execute(session);
+        ShowUnavailableMessageIfNeeded(session, result);
+    }
 
+    private void OnDismissClicked(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: AgentSession session } || _dismissAgentCommand is null || _openDashboardQuery is null)
+        {
+            return;
+        }
+
+        _dismissAgentCommand.Execute(session.Id);
+        Render(_openDashboardQuery.Execute());
+    }
+
+    private void ShowUnavailableMessageIfNeeded(AgentSession session, FocusResult result)
+    {
         MessageBanner.IsVisible = result == FocusResult.WindowNoLongerAvailable;
         MessageBanner.Text = result == FocusResult.WindowNoLongerAvailable
             ? $"The window for '{session.Label}' is no longer available."
@@ -59,11 +93,12 @@ public partial class AgentListWindow : Window
 }
 
 /// <summary>Presentation-only display projection of an AgentSession — never leaks back into Domain.</summary>
-public sealed record AgentListItem(string Label, string StatusText, AgentSession Session)
+public sealed record AgentListItem(string Label, string StatusText, bool IsEnded, AgentSession Session)
 {
     public static AgentListItem From(AgentSession session) => new(
         session.Label,
         session.SessionState == SessionState.Ended ? "Ended" : DescribeActivity(session.ActivityState),
+        session.SessionState == SessionState.Ended,
         session);
 
     private static string DescribeActivity(ActivityState state) => state switch

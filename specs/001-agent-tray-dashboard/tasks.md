@@ -261,69 +261,69 @@ quickstart.md scenario 3.
 
 > Write these tests FIRST, confirm they FAIL, then implement.
 
-- [ ] T047 [P] [US3] Write failing integration test: `WindowsProcessAgentWatcher` raises `SessionEnded`
+- [X] T047 [P] [US3] Write failing integration test: `WindowsProcessAgentWatcher` raises `SessionEnded`
       within the poll interval after a tracked process exits, in
       `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/WindowsProcessAgentWatcherTests.cs`
-- [ ] T048 [P] [US3] Write failing integration test: `MacProcessAgentWatcher` raises `SessionEnded` within
+- [X] T048 [P] [US3] Write failing integration test: `MacProcessAgentWatcher` raises `SessionEnded` within
       the poll interval after a tracked process exits, in
       `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/MacProcessAgentWatcherTests.cs`
-- [ ] T049 [P] [US3] Write failing integration test: `HookEventListener` parses a valid payload on each of
+- [X] T049 [P] [US3] Write failing integration test: `HookEventListener` parses a valid payload on each of
       the five routes in contracts/hook-event-contract.md into the correct `ActivitySignal`
       (`HookEvent` + correlation key + `SummaryText`), and responds with a `4xx` without crashing for a
       malformed payload, in
       `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/HookEventListenerTests.cs`
-- [ ] T050 [P] [US3] Write failing integration test: `ClaudeCodeHookRegistrar` writes the five expected hook
+- [X] T050 [P] [US3] Write failing integration test: `ClaudeCodeHookRegistrar` writes the five expected hook
       commands into a temporary Claude Code config file pointed at a given listener address, and is
       idempotent (a second call updates in place rather than duplicating entries), in
       `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/ClaudeCodeHookRegistrarTests.cs`
-- [ ] T051 [P] [US3] Write failing unit test: `ApplyActivitySignalCommand` correlates an incoming
+- [X] T051 [P] [US3] Write failing unit test: `ApplyActivitySignalCommand` correlates an incoming
       `ActivitySignal` to the right `AgentSession` by `cwd`/`session_id` (R10), applies the
       newest-timestamp-wins rule, and calls `INotifier.NotifyAttention` only on a transition into `Idle`,
       `WaitingForInput`, or `Ended` from a genuinely different state — never for `Working`, never twice for
       the same unacknowledged attention state (FR-007, FR-007a, R11) — using a faked session store and
       faked `INotifier`, in
       `tests/ClaudeAgentDashboard.Application.UnitTests/ApplyActivitySignalCommandTests.cs`
-- [ ] T052 [P] [US3] Write failing integration test: `WindowsToastNotifier` delivers a real toast for each
+- [X] T052 [P] [US3] Write failing integration test: `WindowsToastNotifier` delivers a real toast for each
       `AttentionReason` and raises `NotificationActivated` when clicked, in
       `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/WindowsToastNotifierTests.cs`
       (Windows-only)
-- [ ] T053 [P] [US3] Write failing integration test: `MacUserNotifier` delivers a real `UNUserNotification`
+- [X] T053 [P] [US3] Write failing integration test: `MacUserNotifier` delivers a real `UNUserNotification`
       for each `AttentionReason`, raises `NotificationActivated` when clicked, and reports
       `WasDelivered = false` when authorization is denied, in
       `tests/ClaudeAgentDashboard.Infrastructure.IntegrationTests/MacUserNotifierTests.cs` (macOS-only)
-- [ ] T054 [P] [US3] Write failing unit test: `HandleNotificationActivatedCommand` resolves the correct
+- [X] T054 [P] [US3] Write failing unit test: `HandleNotificationActivatedCommand` resolves the correct
       session's `TerminalWindowReference` and calls `IWindowFocuser.Focus` when
       `INotifier.NotificationActivated` fires, using faked `INotifier` and `IWindowFocuser`, in
       `tests/ClaudeAgentDashboard.Application.UnitTests/HandleNotificationActivatedCommandTests.cs`
-- [ ] T055 [P] [US3] Write failing unit test: `DismissAgentCommand` removes an `Ended` session from the
+- [X] T055 [P] [US3] Write failing unit test: `DismissAgentCommand` removes an `Ended` session from the
       active list and is a no-op for a `Running` session, using a faked session store, in
       `tests/ClaudeAgentDashboard.Application.UnitTests/DismissAgentCommandTests.cs` (closes FR-012's
       missing coverage — surfaced by `/speckit-analyze` finding K1)
 
 ### Implementation for User Story 3
 
-- [ ] T056 [US3] Extend `WindowsProcessAgentWatcher` with `SessionEnded` detection, making T047 pass
+- [X] T056 [US3] Extend `WindowsProcessAgentWatcher` with `SessionEnded` detection, making T047 pass
       (depends on T034)
-- [ ] T057 [US3] Extend `MacProcessAgentWatcher` with `SessionEnded` detection, making T048 pass (depends
+- [X] T057 [US3] Extend `MacProcessAgentWatcher` with `SessionEnded` detection, making T048 pass (depends
       on T035)
-- [ ] T058 [US3] Implement `HookEventListener` (loopback `HttpListener` hosting the five routes from
+- [X] T058 [US3] Implement `HookEventListener` (loopback `HttpListener` hosting the five routes from
       contracts/hook-event-contract.md, implementing `IAgentActivityFeed`), making T049 pass, in
       `src/ClaudeAgentDashboard.Infrastructure/Hooks/HookEventListener.cs` (depends on T019, T024)
-- [ ] T059 [US3] Implement `ClaudeCodeHookRegistrar` (`IHookRegistrar`), making T050 pass, in
+- [X] T059 [US3] Implement `ClaudeCodeHookRegistrar` (`IHookRegistrar`), making T050 pass, in
       `src/ClaudeAgentDashboard.Infrastructure/Hooks/ClaudeCodeHookRegistrar.cs` (depends on T027)
-- [ ] T060 [US3] Implement `ApplyActivitySignalCommand` (correlation per R10, `AgentSession.ApplySignal`,
+- [X] T060 [US3] Implement `ApplyActivitySignalCommand` (correlation per R10, `AgentSession.ApplySignal`,
       and the notify-decision per R11), making T051 pass, in
       `src/ClaudeAgentDashboard.Application/UseCases/ApplyActivitySignalCommand.cs`
-- [ ] T061 [US3] Implement `WindowsToastNotifier`, making T052 pass, in
+- [X] T061 [US3] Implement `WindowsToastNotifier`, making T052 pass, in
       `src/ClaudeAgentDashboard.Infrastructure/Windows/WindowsToastNotifier.cs` (depends on T022, T026)
-- [ ] T062 [US3] Implement `MacUserNotifier`, making T053 pass, in
+- [X] T062 [US3] Implement `MacUserNotifier`, making T053 pass, in
       `src/ClaudeAgentDashboard.Infrastructure/MacOS/MacUserNotifier.cs` (depends on T022, T026)
-- [ ] T063 [US3] Implement `HandleNotificationActivatedCommand`, making T054 pass, in
+- [X] T063 [US3] Implement `HandleNotificationActivatedCommand`, making T054 pass, in
       `src/ClaudeAgentDashboard.Application/UseCases/HandleNotificationActivatedCommand.cs`
-- [ ] T064 [US3] Implement `DismissAgentCommand` in
+- [X] T064 [US3] Implement `DismissAgentCommand` in
       `src/ClaudeAgentDashboard.Application/UseCases/DismissAgentCommand.cs`, making T055 pass (K1: this
       was listed in plan.md's Project Structure but had no task until this fix)
-- [ ] T065 [US3] Update `AgentListWindow` to reflect live `SessionState`/`ActivityState` changes and wire a
+- [X] T065 [US3] Update `AgentListWindow` to reflect live `SessionState`/`ActivityState` changes and wire a
       Dismiss action for ended entries to `DismissAgentCommand` (not direct state manipulation — keeps
       Presentation calling only into Application, per constitution Principle I), and update
       `TrayIconController` to badge agents in an unacknowledged attention-needed state (FR-009), in
@@ -331,11 +331,11 @@ quickstart.md scenario 3.
       `src/ClaudeAgentDashboard.Presentation/TrayIcon/TrayIconController.cs` (depends on T060, T063, T064;
       touches the same `AgentListWindow` file as T037/T045 — sequence after them) — Presentation task, no
       preceding test per constitution v1.1.0
-- [ ] T066 [US3] Add a "Set up activity detection" tray menu action calling `IHookRegistrar.RegisterHooks`
+- [X] T066 [US3] Add a "Set up activity detection" tray menu action calling `IHookRegistrar.RegisterHooks`
       (the FR-013 one-time setup step) in
       `src/ClaudeAgentDashboard.Presentation/TrayIcon/TrayIconController.cs` (depends on T059) —
       Presentation task, no preceding test per constitution v1.1.0
-- [ ] T067 [US3] Register `IAgentActivityFeed`, `IHookRegistrar`, and the OS-appropriate `INotifier` in
+- [X] T067 [US3] Register `IAgentActivityFeed`, `IHookRegistrar`, and the OS-appropriate `INotifier` in
       `CompositionRoot`, and start `HookEventListener` at app startup, in
       `src/ClaudeAgentDashboard.Presentation/CompositionRoot.cs` (depends on T058, T059, T060, T061, T062,
       T063) — Presentation task, no preceding test per constitution v1.1.0

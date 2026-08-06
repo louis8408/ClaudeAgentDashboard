@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.Versioning;
+using ClaudeAgentDashboard.Domain;
 using ClaudeAgentDashboard.Infrastructure.Windows;
 
 namespace ClaudeAgentDashboard.Infrastructure.IntegrationTests;
@@ -24,6 +25,43 @@ public class WindowsProcessAgentWatcherTests
             var sessions = watcher.GetCurrentSessions();
 
             Assert.Contains(sessions, s => s.WindowReference.OwningProcessId == process.Id);
+        }
+        finally
+        {
+            TryKill(process);
+        }
+    }
+
+    [SkippableFact]
+    public async Task Watcher_Raises_SessionEnded_Within_The_Poll_Interval_After_Process_Exits()
+    {
+        Skip.IfNot(OperatingSystem.IsWindows());
+
+        using var process = StartMarkerProcess();
+        try
+        {
+            WaitForWmiVisibility(process.Id);
+
+            using var watcher = new WindowsProcessAgentWatcher();
+            Assert.Contains(watcher.GetCurrentSessions(), s => s.WindowReference.OwningProcessId == process.Id);
+
+            var endedTcs = new TaskCompletionSource();
+            watcher.SessionEnded += session =>
+            {
+                if (session.WindowReference.OwningProcessId == process.Id)
+                {
+                    endedTcs.TrySetResult();
+                }
+            };
+
+            process.Kill(entireProcessTree: true);
+            process.WaitForExit(5000);
+
+            var completed = await Task.WhenAny(endedTcs.Task, Task.Delay(TimeSpan.FromSeconds(10)));
+            Assert.Same(endedTcs.Task, completed);
+
+            var session = watcher.GetCurrentSessions().Single(s => s.WindowReference.OwningProcessId == process.Id);
+            Assert.Equal(SessionState.Ended, session.SessionState);
         }
         finally
         {
