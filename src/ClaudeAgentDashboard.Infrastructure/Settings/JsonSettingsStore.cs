@@ -1,12 +1,11 @@
 using System.Text.Json;
-using ClaudeAgentDashboard.Domain;
 using ClaudeAgentDashboard.Domain.Ports;
 
 namespace ClaudeAgentDashboard.Infrastructure.Settings;
 
 /// <summary>
-/// Persists the small set of user preferences (currently: launch-at-login) to a local JSON
-/// file under the OS per-user app-data directory (research.md R6).
+/// Persists the small set of user preferences (launch-at-login, summary panel collapsed state)
+/// to a local JSON file under the OS per-user app-data directory (research.md R6, R8).
 ///
 /// Defaults <see cref="LaunchAtLoginEnabled"/> to false rather than the true implied by the
 /// spec's "expected to launch at login" assumption: there is no onboarding/settings UI yet
@@ -40,24 +39,14 @@ public sealed class JsonSettingsStore : ISettingsStore
         }
     }
 
-    public string? BackgroundImagePath
+    public bool SummaryPanelCollapsed
     {
-        get => _data.BackgroundImagePath;
+        get => _data.SummaryPanelCollapsed;
         set
         {
-            _data = _data with { BackgroundImagePath = value };
+            _data = _data with { SummaryPanelCollapsed = value };
             Save();
         }
-    }
-
-    public CardPosition? GetCardPosition(string agentLabel) =>
-        _data.CardPositions.TryGetValue(agentLabel, out var position) ? position : null;
-
-    public void SetCardPosition(string agentLabel, CardPosition position)
-    {
-        var updated = new Dictionary<string, CardPosition>(_data.CardPositions) { [agentLabel] = position };
-        _data = _data with { CardPositions = updated };
-        Save();
     }
 
     private static string DefaultFilePath() => Path.Combine(
@@ -99,11 +88,8 @@ public sealed class JsonSettingsStore : ISettingsStore
         File.WriteAllText(_filePath, JsonSerializer.Serialize(_data));
     }
 
-    private sealed record SettingsData(
-        bool LaunchAtLoginEnabled,
-        string? BackgroundImagePath,
-        Dictionary<string, CardPosition> CardPositions)
+    private sealed record SettingsData(bool LaunchAtLoginEnabled, bool SummaryPanelCollapsed)
     {
-        public static SettingsData Empty => new(false, null, []);
+        public static SettingsData Empty => new(false, false);
     }
 }

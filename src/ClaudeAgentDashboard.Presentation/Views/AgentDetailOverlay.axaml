@@ -1,9 +1,25 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="ClaudeAgentDashboard.Presentation.Views.AgentDetailOverlay">
-  <Border Name="OverlayChrome"
-          CornerRadius="16" Padding="20" Width="420" MaxHeight="520"
-          HorizontalAlignment="Center" VerticalAlignment="Center"
+  <UserControl.Styles>
+    <!-- research.md R6: toggling OverlayChrome between these two classes is the whole
+         standard <-> full-window expand/restore mechanism (FR-011/FR-012) — no second
+         window, no separate view, just a size/alignment swap on the same control. -->
+    <Style Selector="Border.standard">
+      <Setter Property="Width" Value="420" />
+      <Setter Property="MaxHeight" Value="520" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.expanded">
+      <Setter Property="Width" Value="NaN" />
+      <Setter Property="MaxHeight" Value="NaN" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="VerticalAlignment" Value="Stretch" />
+    </Style>
+  </UserControl.Styles>
+  <Border Name="OverlayChrome" Classes="standard"
+          CornerRadius="16" Padding="20"
           BorderThickness="1" BorderBrush="#33FFFFFF"
           BoxShadow="0 16 40 -10 #AA000000">
     <Border.Background>
@@ -13,10 +29,13 @@
       </LinearGradientBrush>
     </Border.Background>
     <DockPanel>
-      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto">
+      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto">
         <TextBlock Name="AgentLabelText" Grid.Column="0" FontWeight="SemiBold" FontSize="15"
                    Foreground="White" TextWrapping="Wrap" />
-        <Button Grid.Column="1" Content="✕" Click="OnCloseClicked"
+        <Button Name="ExpandToggleButton" Grid.Column="1" Content="⤢" Click="OnExpandToggleClicked"
+                Background="Transparent" BorderThickness="0" Foreground="#AAFFFFFF"
+                CornerRadius="6" Padding="6,2" Margin="0,0,4,0" />
+        <Button Grid.Column="2" Content="✕" Click="OnCloseClicked"
                 Background="Transparent" BorderThickness="0" Foreground="#AAFFFFFF"
                 CornerRadius="6" Padding="6,2" />
       </Grid>

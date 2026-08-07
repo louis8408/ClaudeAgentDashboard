@@ -29,6 +29,9 @@ public partial class AgentDetailOverlay : UserControl
     /// <summary>Raised when the user clicks the close button — the caller hides/removes this overlay.</summary>
     public event EventHandler? CloseRequested;
 
+    /// <summary>Whether this overlay currently fills the whole window rather than its standard size (FR-011/FR-012).</summary>
+    public bool IsExpanded { get; private set; }
+
     public AgentDetailOverlay()
         : this(DesignTimeSession(), null, null, null, null, null, null)
     {
@@ -68,6 +71,21 @@ public partial class AgentDetailOverlay : UserControl
 
     /// <summary>Stops the live-refresh timer — call when this overlay is hidden/removed.</summary>
     public void StopRefreshing() => _refreshTimer?.Stop();
+
+    /// <summary>
+    /// Sets expanded/standard display mode without toggling from the current state — used when
+    /// switching this overlay to a different agent, to preserve whichever mode was already
+    /// active (FR-014) rather than always resetting to standard.
+    /// </summary>
+    public void SetExpanded(bool expanded)
+    {
+        IsExpanded = expanded;
+        OverlayChrome.Classes.Set("standard", !expanded);
+        OverlayChrome.Classes.Set("expanded", expanded);
+        ExpandToggleButton.Content = expanded ? "⤡" : "⤢";
+    }
+
+    private void OnExpandToggleClicked(object? sender, RoutedEventArgs e) => SetExpanded(!IsExpanded);
 
     private void Render(AgentActivityView? activity)
     {

@@ -54,6 +54,10 @@ public static class CompositionRoot
         services.AddSingleton<ViewAgentTranscriptQuery>();
         services.AddSingleton<ISettingsStore, JsonSettingsStore>();
 
+        services.AddSingleton<IUsageMetricsReader, JsonlUsageMetricsReader>();
+        services.AddSingleton<FleetMetricsHistory>();
+        services.AddSingleton<ViewFleetSummaryQuery>();
+
         var provider = services.BuildServiceProvider();
         WireEventSubscriptions(provider);
         ApplyLoginItemSetting(provider);

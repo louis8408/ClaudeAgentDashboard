@@ -1,0 +1,42 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:v="using:ClaudeAgentDashboard.Presentation.Views"
+             x:Class="ClaudeAgentDashboard.Presentation.Views.FleetSummaryPanel">
+  <Border Classes="cc-panel">
+    <StackPanel Spacing="10" Margin="16,12">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Classes="cc-heading" Text="FLEET STATUS" VerticalAlignment="Center" />
+        <Button Name="ToggleButton" Grid.Column="1" Classes="cc-button" Content="Collapse ▴" Click="OnToggleClicked" />
+      </Grid>
+
+      <StackPanel Name="BodyPanel" Spacing="12">
+        <Grid Name="StatsGrid" ColumnDefinitions="*,*,*">
+          <StackPanel Grid.Column="0" Spacing="2">
+            <TextBlock Name="RunningCountText" Text="0" Foreground="{DynamicResource CcAccentBrush}" FontSize="22" FontWeight="Bold" />
+            <TextBlock Text="RUNNING AGENTS" Foreground="{DynamicResource CcMutedTextBrush}" FontSize="10" LetterSpacing="1" />
+            <v:SparklineControl Name="RunningCountSparkline" Height="28" Margin="0,4,0,0"
+                                 Stroke="{DynamicResource CcAccentBrush}" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="1" Spacing="2" Margin="20,0,0,0">
+            <TextBlock Name="TokensUsedText" Text="0" Foreground="{DynamicResource CcAccentBrush}" FontSize="22" FontWeight="Bold" />
+            <TextBlock Text="TOKENS USED" Foreground="{DynamicResource CcMutedTextBrush}" FontSize="10" LetterSpacing="1" />
+            <v:SparklineControl Name="TokensUsedSparkline" Height="28" Margin="0,4,0,0"
+                                 Stroke="{DynamicResource CcAccentBrush}" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="2" Spacing="2" Margin="20,0,0,0">
+            <TextBlock Name="ContextAvailableText" Text="0" Foreground="{DynamicResource CcAccentBrush}" FontSize="22" FontWeight="Bold" />
+            <TextBlock Text="CONTEXT WINDOW AVAILABLE" Foreground="{DynamicResource CcMutedTextBrush}" FontSize="10" LetterSpacing="1" />
+          </StackPanel>
+        </Grid>
+
+        <TextBlock Name="PartialNoticeText" Text="Figures are partial — some agents haven't reported usage yet."
+                   Foreground="#FFAB4C" FontSize="11" IsVisible="False" />
+      </StackPanel>
+
+      <TextBlock Name="CollapsedSummaryText" IsVisible="False"
+                 Foreground="{DynamicResource CcMutedTextBrush}" FontSize="12" />
+    </StackPanel>
+  </Border>
+</UserControl>

@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using ClaudeAgentDashboard.Domain.Ports;
@@ -70,9 +71,19 @@ public sealed class ClaudeCodeHookRegistrar : IHookRegistrar
     private static string BuildCommand(Uri baseAddress, string route)
     {
         var url = new Uri(baseAddress, $"hooks/{route}");
-        return OperatingSystem.IsWindows()
-            ? $"powershell -NoProfile -Command \"$input = [Console]::In.ReadToEnd(); Invoke-RestMethod -Uri '{url}' -Method Post -Body $input -ContentType 'application/json'\""
-            : $"curl -s -X POST '{url}' -H 'Content-Type: application/json' -d @-";
+        if (!OperatingSystem.IsWindows())
+        {
+            return $"curl -s -X POST '{url}' -H 'Content-Type: application/json' -d @-";
+        }
+
+        // Claude Code spawns hook commands through an intermediary shell (cmd.exe on
+        // Windows), which mangles the nested single/double quotes and parentheses an inline
+        // "-Command \"...\"" string needs — this broke in production ("An expression was
+        // expected after '('" right after ReadToEnd()). -EncodedCommand sidesteps shell
+        // quoting entirely: the payload is plain Base64, which no shell re-parses.
+        var script = $"$body = [Console]::In.ReadToEnd(); Invoke-RestMethod -Uri '{url}' -Method Post -Body $body -ContentType 'application/json'";
+        var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
+        return $"powershell -NoProfile -NonInteractive -EncodedCommand {encoded}";
     }
 
     private JsonObject LoadRoot()
@@ -94,7 +105,40 @@ public sealed class ClaudeCodeHookRegistrar : IHookRegistrar
     private JsonObject LoadHooksObject() => LoadRoot()["hooks"] as JsonObject ?? new JsonObject();
 
     private static bool ContainsOwnCommand(JsonObject hooks, string hookEventName) =>
-        EnumerateCommands(hooks, hookEventName).Any(command => command.Contains(OwnershipMarker, StringComparison.Ordinal));
+        EnumerateCommands(hooks, hookEventName).Any(BelongsToUs);
+
+    // The Windows command Base64-encodes its script (BuildCommand), so the "/hooks/" marker
+    // no longer appears as a literal substring on that platform — decode it first before
+    // checking. The curl-based macOS command still contains it directly.
+    private static bool BelongsToUs(string command)
+    {
+        if (command.Contains(OwnershipMarker, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return TryDecodeEncodedCommand(command) is { } decoded
+            && decoded.Contains(OwnershipMarker, StringComparison.Ordinal);
+    }
+
+    private static string? TryDecodeEncodedCommand(string command)
+    {
+        const string marker = "-EncodedCommand ";
+        var index = command.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (index < 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            return Encoding.Unicode.GetString(Convert.FromBase64String(command[(index + marker.Length)..].Trim()));
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
+    }
 
     private static void Upsert(JsonObject hooks, string hookEventName, string command)
     {
@@ -131,7 +175,7 @@ public sealed class ClaudeCodeHookRegistrar : IHookRegistrar
         (entry["hooks"] as JsonArray)?
             .OfType<JsonObject>()
             .Select(h => h["command"]?.GetValue<string>())
-            .Any(command => command?.Contains(OwnershipMarker, StringComparison.Ordinal) == true)
+            .Any(command => command is not null && BelongsToUs(command))
         ?? false;
 
     private static IEnumerable<string> EnumerateCommands(JsonObject hooks, string hookEventName)

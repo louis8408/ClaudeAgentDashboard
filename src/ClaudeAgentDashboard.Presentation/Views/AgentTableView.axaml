@@ -1,0 +1,27 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="ClaudeAgentDashboard.Presentation.Views.AgentTableView">
+  <Border Classes="cc-panel" Padding="0">
+    <Grid RowDefinitions="Auto,*">
+      <Grid Grid.Row="0" ColumnDefinitions="*,140" Margin="16,12,16,10">
+        <TextBlock Grid.Column="0" Classes="cc-heading" Text="AGENT" />
+        <TextBlock Grid.Column="1" Classes="cc-heading" Text="STATUS" />
+      </Grid>
+      <Border Grid.Row="0" VerticalAlignment="Bottom" Height="1" Background="{DynamicResource CcBorderBrush}" />
+
+      <Grid Grid.Row="1">
+        <StackPanel Name="EmptyStatePanel" Spacing="4"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="False">
+          <TextBlock Text="No Claude Code agents detected" Classes="cc-heading"
+                     HorizontalAlignment="Center" />
+          <TextBlock Text="Start a Claude Code CLI session and it will appear here."
+                     Foreground="{DynamicResource CcMutedTextBrush}" FontSize="11.5"
+                     HorizontalAlignment="Center" />
+        </StackPanel>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Name="RowsPanel" />
+        </ScrollViewer>
+      </Grid>
+    </Grid>
+  </Border>
+</UserControl>

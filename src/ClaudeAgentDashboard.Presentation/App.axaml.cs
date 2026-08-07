@@ -59,12 +59,13 @@ public partial class App : Avalonia.Application
         var dismissAgentCommand = Services.GetRequiredService<DismissAgentCommand>();
         var viewAgentActivityQuery = Services.GetRequiredService<ViewAgentActivityQuery>();
         var viewAgentTranscriptQuery = Services.GetRequiredService<ViewAgentTranscriptQuery>();
+        var viewFleetSummaryQuery = Services.GetRequiredService<ViewFleetSummaryQuery>();
         var settingsStore = Services.GetRequiredService<ISettingsStore>();
         var hookRegistrar = Services.GetRequiredService<IHookRegistrar>();
         var hookListenerBaseAddress = Services.GetRequiredService<HookListenerAddress>().Value;
         _desktopWindow = new DesktopWindow(
             openDashboardQuery, showAgentCommand, dismissAgentCommand, viewAgentActivityQuery, viewAgentTranscriptQuery,
-            settingsStore, hookRegistrar, hookListenerBaseAddress);
+            viewFleetSummaryQuery, settingsStore, hookRegistrar, hookListenerBaseAddress);
         _desktopWindow.Closed += (_, _) => _desktopWindow = null;
         _desktopWindow.Show();
         _desktopWindow.Activate();
