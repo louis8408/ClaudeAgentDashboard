@@ -6,6 +6,8 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AnalysisLevel>latest</AnalysisLevel>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <!-- Overridden by CI via -p:Version=X.Y.Z (from the release tag) when packaging installers. -->
+    <Version>0.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

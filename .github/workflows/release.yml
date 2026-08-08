@@ -1,0 +1,126 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (e.g. 1.0.0) — for test builds only, does not publish a GitHub Release"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Publish win-x64
+        run: >
+          dotnet publish src/ClaudeAgentDashboard.Presentation/ClaudeAgentDashboard.Presentation.csproj
+          --configuration Release --runtime win-x64 --self-contained true
+          -p:Version=${{ steps.version.outputs.version }}
+          -p:PublishSingleFile=false
+          --output publish/win-x64
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer with Inno Setup
+        shell: cmd
+        run: |
+          mkdir "%GITHUB_WORKSPACE%\artifacts\windows"
+          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=${{ steps.version.outputs.version }} /DSourceDir=%GITHUB_WORKSPACE%\publish\win-x64 /DOutputDir=%GITHUB_WORKSPACE%\artifacts\windows installer\windows\setup.iss
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: artifacts/windows/*.exe
+
+  macos-dmg:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        rid: [osx-x64, osx-arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Publish ${{ matrix.rid }}
+        run: >
+          dotnet publish src/ClaudeAgentDashboard.Presentation/ClaudeAgentDashboard.Presentation.csproj
+          --configuration Release --runtime ${{ matrix.rid }} --self-contained true
+          -p:Version=${{ steps.version.outputs.version }}
+          -p:PublishSingleFile=false
+          --output publish/${{ matrix.rid }}
+
+      - name: Build .app and .dmg
+        run: >
+          bash installer/macos/build-dmg.sh
+          ${{ steps.version.outputs.version }}
+          ${{ matrix.rid }}
+          publish/${{ matrix.rid }}
+          artifacts/macos
+
+      - name: Upload dmg artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg-${{ matrix.rid }}
+          path: artifacts/macos/*.dmg
+
+  github-release:
+    needs: [windows-installer, macos-dmg]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloads
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "${{ github.ref_name }}"
+          downloads/windows-installer/*.exe
+          downloads/macos-dmg-osx-x64/*.dmg
+          downloads/macos-dmg-osx-arm64/*.dmg
+          --title "${{ github.ref_name }}"
+          --generate-notes
