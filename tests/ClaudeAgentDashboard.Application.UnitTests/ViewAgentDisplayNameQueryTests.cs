@@ -24,9 +24,13 @@ public class ViewAgentDisplayNameQueryTests
     [Fact]
     public void Execute_Falls_Back_To_The_Working_Directorys_Final_Segment_When_No_Title_Yet()
     {
+        // Path.Combine (not a hardcoded @"C:\..." literal) so this asserts the same thing on
+        // Windows and macOS CI runners alike — Path.GetFileName only treats '\' as a separator
+        // on Windows, so a hardcoded backslash path silently stops splitting on macOS.
+        var workingDirectory = Path.Combine("Users", "louis", "source", "repos", "ClaudeAgentDashboard");
         var session = new AgentSession(
             Guid.NewGuid(), "raw command line label", DateTimeOffset.UtcNow, new TerminalWindowReference(1),
-            @"C:\Users\louis\source\repos\ClaudeAgentDashboard");
+            workingDirectory);
         var registry = new AgentSessionRegistry(new FakeAgentWatcher([session]));
         var query = new ViewAgentDisplayNameQuery(registry, new FakeTitleReader(new Dictionary<string, string>()));
 
