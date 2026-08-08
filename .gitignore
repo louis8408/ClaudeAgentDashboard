@@ -25,3 +25,7 @@ x86/
 ## Misc OS files
 .DS_Store
 Thumbs.db
+
+## Local installer build output (installer/*/build scripts, dotnet publish -o)
+/publish/
+/artifacts/
