@@ -1,5 +1,7 @@
 # Claude Agent Dashboard
 
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+
 A cross-platform (Windows + macOS) background tray/menu-bar app that gives
 you a command-center view of every Claude Code CLI agent running on your
 machine: a live table of agents with their mode and status, a collapsible
@@ -149,6 +151,12 @@ validation log, not swept under the rug:
 - **Both installers are unsigned.** Windows SmartScreen and macOS
   Gatekeeper will both warn on first run; there's no code-signing
   certificate for either platform yet.
+
+## License
+
+[GPL-3.0](LICENSE) — you're free to use, study, modify, and redistribute
+this software, including commercially; any distributed modified version
+must also be licensed under GPL-3.0 and made available in source form.
 
 ## Testing
 
