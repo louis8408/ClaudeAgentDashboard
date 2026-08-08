@@ -1,4 +1,5 @@
 using System.Runtime.Versioning;
+using ClaudeAgentDashboard.Domain.Ports;
 
 namespace ClaudeAgentDashboard.Infrastructure.MacOS;
 
@@ -7,7 +8,7 @@ namespace ClaudeAgentDashboard.Infrastructure.MacOS;
 /// gated by <see cref="ClaudeAgentDashboard.Domain.Ports.ISettingsStore.LaunchAtLoginEnabled"/>.
 /// </summary>
 [SupportedOSPlatform("macos")]
-public sealed class MacLoginItemRegistrar
+public sealed class MacLoginItemRegistrar : ILoginItemRegistrar
 {
     private const string Label = "com.claudeagentdashboard";
 

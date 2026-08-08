@@ -1,20 +1,20 @@
 using System.Text.Json;
+using ClaudeAgentDashboard.Domain;
 using ClaudeAgentDashboard.Domain.Ports;
 
 namespace ClaudeAgentDashboard.Infrastructure.Transcripts;
 
 /// <summary>
-/// Reads recent entries from a Claude Code transcript file (JSONL — one JSON object per line)
-/// for display in the detail overlay (FR-019, R16). Reads fresh on every call rather than
-/// tailing/watching the file, matching the overlay's existing poll-based refresh cadence.
-/// Tolerant of an unrecognized or evolving line shape: renders whatever text it can find and
-/// falls back to a raw (truncated) line rather than dropping content it doesn't understand.
+/// Reads recent conversational turns from a Claude Code transcript file (JSONL — one JSON
+/// object per line) for display in the detail overlay's chat view (FR-019, R16). Reads fresh
+/// on every call rather than tailing/watching the file, matching the overlay's existing
+/// poll-based refresh cadence. Only "user"/"assistant" lines with extractable plain text
+/// become entries — hook events, attachments, and other metadata lines are filtered out
+/// rather than rendered as raw JSON noise.
 /// </summary>
 public sealed class JsonlTranscriptReader : ITranscriptReader
 {
-    private const int MaxRawLineLength = 200;
-
-    public IReadOnlyList<string> ReadRecentEntries(string transcriptPath, int maxEntries)
+    public IReadOnlyList<TranscriptEntry> ReadRecentEntries(string transcriptPath, int maxEntries)
     {
         if (string.IsNullOrWhiteSpace(transcriptPath) || maxEntries <= 0)
         {
@@ -36,7 +36,7 @@ public sealed class JsonlTranscriptReader : ITranscriptReader
             return [];
         }
 
-        var entries = new List<string>();
+        var entries = new List<TranscriptEntry>();
         foreach (var line in lines.Reverse())
         {
             if (entries.Count >= maxEntries)
@@ -44,10 +44,10 @@ public sealed class JsonlTranscriptReader : ITranscriptReader
                 break;
             }
 
-            var rendered = TryRender(line);
-            if (rendered is not null)
+            var entry = TryParseChatTurn(line);
+            if (entry is not null)
             {
-                entries.Add(rendered);
+                entries.Add(entry);
             }
         }
 
@@ -55,7 +55,7 @@ public sealed class JsonlTranscriptReader : ITranscriptReader
         return entries;
     }
 
-    private static string? TryRender(string line)
+    private static TranscriptEntry? TryParseChatTurn(string line)
     {
         if (string.IsNullOrWhiteSpace(line))
         {
@@ -68,20 +68,18 @@ public sealed class JsonlTranscriptReader : ITranscriptReader
             var root = document.RootElement;
 
             var role = root.TryGetProperty("type", out var typeProp) ? typeProp.GetString() : null;
-            var text = ExtractText(root);
-
-            if (text is not null)
+            if (role is not ("user" or "assistant"))
             {
-                return string.IsNullOrEmpty(role) ? text : $"{role}: {text}";
+                return null;
             }
+
+            var text = ExtractText(root);
+            return string.IsNullOrWhiteSpace(text) ? null : new TranscriptEntry(role, text);
         }
         catch (JsonException)
         {
-            // Fall through to the raw-line fallback below — an unrecognized/evolving
-            // transcript line shape is not an error, just less nicely rendered.
+            return null;
         }
-
-        return line.Length <= MaxRawLineLength ? line : line[..MaxRawLineLength] + "…";
     }
 
     private static string? ExtractText(JsonElement root)

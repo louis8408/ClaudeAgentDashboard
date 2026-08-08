@@ -8,9 +8,10 @@ namespace ClaudeAgentDashboard.Application.UseCases;
 /// incoming hook-derived <see cref="ActivitySignal"/> to its <see cref="AgentSession"/>
 /// (research.md R10), folds it in, and raises exactly one attention notification per
 /// genuine transition into Idle/WaitingForInput/Ended — never for Working, and never twice
-/// for the same unacknowledged attention streak (FR-007, FR-007a, research.md R11).
+/// for the same unacknowledged attention streak (FR-007, FR-007a, research.md R11). Each
+/// reason is additionally gated by the user's own Settings preference for that reason.
 /// </summary>
-public sealed class ApplyActivitySignalCommand(AgentSessionRegistry registry, INotifier notifier)
+public sealed class ApplyActivitySignalCommand(AgentSessionRegistry registry, INotifier notifier, ISettingsStore settingsStore)
 {
     public async Task ExecuteAsync(ActivitySignal signal)
     {
@@ -31,11 +32,19 @@ public sealed class ApplyActivitySignalCommand(AgentSessionRegistry registry, IN
         }
 
         var reason = DetermineAttentionReason(previousSessionState, previousActivityState, session);
-        if (reason is not null)
+        if (reason is not null && IsNotificationEnabled(reason.Value))
         {
             await notifier.NotifyAttention(session, reason.Value).ConfigureAwait(false);
         }
     }
+
+    private bool IsNotificationEnabled(AttentionReason reason) => reason switch
+    {
+        AttentionReason.Idle => settingsStore.NotifyOnIdle,
+        AttentionReason.WaitingForInput => settingsStore.NotifyOnWaitingForInput,
+        AttentionReason.Ended => settingsStore.NotifyOnEnded,
+        _ => true,
+    };
 
     private static AttentionReason? DetermineAttentionReason(
         SessionState previousSessionState, ActivityState previousActivityState, AgentSession session)

@@ -21,6 +21,8 @@ public partial class DesktopWindow : Window
     private readonly DismissAgentCommand? _dismissAgentCommand;
     private readonly ViewAgentActivityQuery? _viewAgentActivityQuery;
     private readonly ViewAgentTranscriptQuery? _viewAgentTranscriptQuery;
+    private readonly ViewAgentModeQuery? _viewAgentModeQuery;
+    private readonly ViewAgentDisplayNameQuery? _viewAgentDisplayNameQuery;
     private readonly IHookRegistrar? _hookRegistrar;
     private readonly Uri? _hookListenerBaseAddress;
     private readonly DispatcherTimer? _refreshTimer;
@@ -28,7 +30,7 @@ public partial class DesktopWindow : Window
     private AgentDetailOverlay? _openOverlay;
 
     public DesktopWindow()
-        : this(null, null, null, null, null, null, null, null, null)
+        : this(null, null, null, null, null, null, null, null, null, null, null)
     {
     }
 
@@ -38,6 +40,8 @@ public partial class DesktopWindow : Window
         DismissAgentCommand? dismissAgentCommand,
         ViewAgentActivityQuery? viewAgentActivityQuery,
         ViewAgentTranscriptQuery? viewAgentTranscriptQuery,
+        ViewAgentModeQuery? viewAgentModeQuery,
+        ViewAgentDisplayNameQuery? viewAgentDisplayNameQuery,
         ViewFleetSummaryQuery? viewFleetSummaryQuery,
         ISettingsStore? settingsStore,
         IHookRegistrar? hookRegistrar,
@@ -47,6 +51,8 @@ public partial class DesktopWindow : Window
         _dismissAgentCommand = dismissAgentCommand;
         _viewAgentActivityQuery = viewAgentActivityQuery;
         _viewAgentTranscriptQuery = viewAgentTranscriptQuery;
+        _viewAgentModeQuery = viewAgentModeQuery;
+        _viewAgentDisplayNameQuery = viewAgentDisplayNameQuery;
         _hookRegistrar = hookRegistrar;
         _hookListenerBaseAddress = hookListenerBaseAddress;
 
@@ -55,14 +61,28 @@ public partial class DesktopWindow : Window
         var table = new AgentTableView();
         table.AgentClicked += (_, session) => OpenOverlay(session);
         TableHost.Content = table;
-        table.Render(openDashboardQuery?.Execute() ?? []);
+        table.Render(openDashboardQuery?.Execute() ?? [], _viewAgentModeQuery, _viewAgentDisplayNameQuery);
 
         InitializeSummaryPanel(viewFleetSummaryQuery, settingsStore);
+
+        // Minimize-to-tray (Settings): cancel the real close and hide instead, so the window
+        // instance — and its live refresh timers/table/overlay state — survives; the tray icon
+        // click handler already treats a non-null hidden window as "just re-show it" (App.axaml.cs).
+        // The app process itself always survives window close via the tray regardless of this
+        // setting — this only controls whether the window is recreated from scratch or reused.
+        Closing += (_, e) =>
+        {
+            if (settingsStore?.MinimizeToTrayOnClose == true)
+            {
+                e.Cancel = true;
+                Hide();
+            }
+        };
 
         if (openDashboardQuery is not null)
         {
             _refreshTimer = new DispatcherTimer { Interval = RefreshInterval };
-            _refreshTimer.Tick += (_, _) => table.Render(openDashboardQuery.Execute());
+            _refreshTimer.Tick += (_, _) => table.Render(openDashboardQuery.Execute(), _viewAgentModeQuery, _viewAgentDisplayNameQuery);
             _refreshTimer.Start();
             Closed += (_, _) =>
             {
@@ -99,7 +119,7 @@ public partial class DesktopWindow : Window
 
         var overlay = new AgentDetailOverlay(
             session, _showAgentCommand, _dismissAgentCommand, _viewAgentActivityQuery, _viewAgentTranscriptQuery,
-            _hookRegistrar, _hookListenerBaseAddress);
+            _viewAgentModeQuery, _viewAgentDisplayNameQuery, _hookRegistrar, _hookListenerBaseAddress);
         overlay.CloseRequested += (_, _) => CloseOverlay();
         overlay.SetExpanded(wasExpanded);
 

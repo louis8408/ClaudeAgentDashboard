@@ -12,7 +12,7 @@ public class ApplyActivitySignalCommandTests
         var session = CreateSession("C:\\work\\my-project");
         var registry = new AgentSessionRegistry(new FakeAgentWatcher([session]));
         var notifier = new FakeNotifier();
-        var command = new ApplyActivitySignalCommand(registry, notifier);
+        var command = new ApplyActivitySignalCommand(registry, notifier, new FakeSettingsStore());
 
         await command.ExecuteAsync(new ActivitySignal("C:\\work\\my-project", HookEvent.UserPromptSubmit, DateTimeOffset.UtcNow));
 
@@ -26,7 +26,7 @@ public class ApplyActivitySignalCommandTests
         var session = CreateSession("C:\\work\\my-project");
         var registry = new AgentSessionRegistry(new FakeAgentWatcher([session]));
         var notifier = new FakeNotifier();
-        var command = new ApplyActivitySignalCommand(registry, notifier);
+        var command = new ApplyActivitySignalCommand(registry, notifier, new FakeSettingsStore());
         var now = DateTimeOffset.UtcNow;
 
         await command.ExecuteAsync(new ActivitySignal("C:\\work\\my-project", HookEvent.PreToolUse, now));
@@ -43,7 +43,7 @@ public class ApplyActivitySignalCommandTests
         var session = CreateSession("C:\\work\\my-project");
         var registry = new AgentSessionRegistry(new FakeAgentWatcher([session]));
         var notifier = new FakeNotifier();
-        var command = new ApplyActivitySignalCommand(registry, notifier);
+        var command = new ApplyActivitySignalCommand(registry, notifier, new FakeSettingsStore());
         var now = DateTimeOffset.UtcNow;
 
         // Working -> Idle (notify) -> WaitingForInput (no intervening Working, no 2nd notify)
@@ -62,7 +62,7 @@ public class ApplyActivitySignalCommandTests
         var session = CreateSession("C:\\work\\my-project");
         var registry = new AgentSessionRegistry(new FakeAgentWatcher([session]));
         var notifier = new FakeNotifier();
-        var command = new ApplyActivitySignalCommand(registry, notifier);
+        var command = new ApplyActivitySignalCommand(registry, notifier, new FakeSettingsStore());
         var now = DateTimeOffset.UtcNow;
 
         await command.ExecuteAsync(new ActivitySignal("C:\\work\\my-project", HookEvent.PreToolUse, now));
@@ -80,7 +80,7 @@ public class ApplyActivitySignalCommandTests
         var session = CreateSession("C:\\work\\my-project");
         var registry = new AgentSessionRegistry(new FakeAgentWatcher([session]));
         var notifier = new FakeNotifier();
-        var command = new ApplyActivitySignalCommand(registry, notifier);
+        var command = new ApplyActivitySignalCommand(registry, notifier, new FakeSettingsStore());
 
         await command.ExecuteAsync(new ActivitySignal("C:\\work\\my-project", HookEvent.SessionEnd, DateTimeOffset.UtcNow));
 
@@ -94,10 +94,59 @@ public class ApplyActivitySignalCommandTests
     {
         var registry = new AgentSessionRegistry(new FakeAgentWatcher([]));
         var notifier = new FakeNotifier();
-        var command = new ApplyActivitySignalCommand(registry, notifier);
+        var command = new ApplyActivitySignalCommand(registry, notifier, new FakeSettingsStore());
 
         await command.ExecuteAsync(new ActivitySignal("C:\\unknown\\path", HookEvent.Stop, DateTimeOffset.UtcNow));
 
+        Assert.Empty(notifier.Notifications);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Does_Not_Notify_Idle_When_Disabled_In_Settings()
+    {
+        var session = CreateSession("C:\\work\\my-project");
+        var registry = new AgentSessionRegistry(new FakeAgentWatcher([session]));
+        var notifier = new FakeNotifier();
+        var settings = new FakeSettingsStore { NotifyOnIdle = false };
+        var command = new ApplyActivitySignalCommand(registry, notifier, settings);
+        var now = DateTimeOffset.UtcNow;
+
+        await command.ExecuteAsync(new ActivitySignal("C:\\work\\my-project", HookEvent.PreToolUse, now));
+        await command.ExecuteAsync(new ActivitySignal("C:\\work\\my-project", HookEvent.Stop, now.AddSeconds(1)));
+
+        Assert.Equal(ActivityState.Idle, session.ActivityState);
+        Assert.Empty(notifier.Notifications);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Does_Not_Notify_WaitingForInput_When_Disabled_In_Settings()
+    {
+        var session = CreateSession("C:\\work\\my-project");
+        var registry = new AgentSessionRegistry(new FakeAgentWatcher([session]));
+        var notifier = new FakeNotifier();
+        var settings = new FakeSettingsStore { NotifyOnWaitingForInput = false };
+        var command = new ApplyActivitySignalCommand(registry, notifier, settings);
+        var now = DateTimeOffset.UtcNow;
+
+        await command.ExecuteAsync(new ActivitySignal("C:\\work\\my-project", HookEvent.PreToolUse, now));
+        await command.ExecuteAsync(new ActivitySignal("C:\\work\\my-project", HookEvent.Notification, now.AddSeconds(1)));
+
+        Assert.Equal(ActivityState.WaitingForInput, session.ActivityState);
+        Assert.Empty(notifier.Notifications);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Does_Not_Notify_Ended_When_Disabled_In_Settings()
+    {
+        var session = CreateSession("C:\\work\\my-project");
+        var registry = new AgentSessionRegistry(new FakeAgentWatcher([session]));
+        var notifier = new FakeNotifier();
+        var settings = new FakeSettingsStore { NotifyOnEnded = false };
+        var command = new ApplyActivitySignalCommand(registry, notifier, settings);
+
+        await command.ExecuteAsync(new ActivitySignal("C:\\work\\my-project", HookEvent.SessionEnd, DateTimeOffset.UtcNow));
+
+        Assert.Equal(SessionState.Ended, session.SessionState);
         Assert.Empty(notifier.Notifications);
     }
 
@@ -127,5 +176,16 @@ public class ApplyActivitySignalCommandTests
             Notifications.Add((session.Id, reason));
             return Task.FromResult(true);
         }
+    }
+
+    private sealed class FakeSettingsStore : ISettingsStore
+    {
+        public bool LaunchAtLoginEnabled { get; set; }
+        public bool SummaryPanelCollapsed { get; set; }
+        public bool NotifyOnIdle { get; set; } = true;
+        public bool NotifyOnWaitingForInput { get; set; } = true;
+        public bool NotifyOnEnded { get; set; } = true;
+        public AppTheme Theme { get; set; }
+        public bool MinimizeToTrayOnClose { get; set; } = true;
     }
 }

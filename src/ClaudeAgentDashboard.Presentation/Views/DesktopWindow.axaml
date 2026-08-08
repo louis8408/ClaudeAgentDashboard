@@ -6,59 +6,12 @@
         Background="{DynamicResource CcBackgroundBrush}">
 
   <!--
-    Command-center visual theme (FR-013): shared across this window and every child view
-    (AgentTableView, FleetSummaryPanel, AgentDetailOverlay, SparklineControl) via Avalonia's
-    up-the-tree resource lookup — dark HUD palette, cyan glow accents, monospace-leaning type
-    for status/data text. Per-status colors (working/idle/waiting/ended) stay in
-    ActivityPresentation.cs, unchanged from 001, so this theme layers on top rather than
-    replacing that mapping.
+    Command-center visual theme (FR-013): the actual palette (dark/light) lives in
+    App.axaml/Theming.ThemeResources, shared by every window and child view via Avalonia's
+    up-the-tree DynamicResource lookup — this window only consumes it, it doesn't own it, so
+    a sibling window (SettingsWindow) can use the exact same palette. Per-status colors
+    (working/idle/waiting/ended) stay in ActivityPresentation.cs, unchanged from 001.
   -->
-  <Window.Resources>
-    <SolidColorBrush x:Key="CcAccentBrush" Color="#00E5FF" />
-    <SolidColorBrush x:Key="CcAccentDimBrush" Color="#5C00E5FF" />
-    <SolidColorBrush x:Key="CcTextBrush" Color="#E8FBFF" />
-    <SolidColorBrush x:Key="CcMutedTextBrush" Color="#8FB4BD" />
-    <SolidColorBrush x:Key="CcBorderBrush" Color="#3300E5FF" />
-    <SolidColorBrush x:Key="CcPanelBrush" Color="#B30A0F16" />
-    <FontFamily x:Key="CcFontFamily">Consolas,Menlo,Monospace</FontFamily>
-    <LinearGradientBrush x:Key="CcBackgroundBrush" StartPoint="0%,0%" EndPoint="100%,100%">
-      <GradientStop Color="#FF05070C" Offset="0" />
-      <GradientStop Color="#FF0A0F16" Offset="0.55" />
-      <GradientStop Color="#FF060A10" Offset="1" />
-    </LinearGradientBrush>
-  </Window.Resources>
-
-  <Window.Styles>
-    <Style Selector="TextBlock">
-      <Setter Property="FontFamily" Value="{DynamicResource CcFontFamily}" />
-    </Style>
-    <Style Selector="Border.cc-panel">
-      <Setter Property="Background" Value="{DynamicResource CcPanelBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource CcBorderBrush}" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="10" />
-      <Setter Property="BoxShadow" Value="0 0 18 -6 #4000E5FF" />
-    </Style>
-    <Style Selector="TextBlock.cc-heading">
-      <Setter Property="Foreground" Value="{DynamicResource CcAccentBrush}" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="LetterSpacing" Value="1.5" />
-    </Style>
-    <Style Selector="Button.cc-button">
-      <Setter Property="Background" Value="#1400E5FF" />
-      <Setter Property="Foreground" Value="{DynamicResource CcTextBrush}" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="BorderBrush" Value="{DynamicResource CcBorderBrush}" />
-      <Setter Property="CornerRadius" Value="6" />
-      <Setter Property="Padding" Value="10,4" />
-      <Setter Property="FontSize" Value="11.5" />
-      <Setter Property="FontFamily" Value="{DynamicResource CcFontFamily}" />
-    </Style>
-    <Style Selector="Button.cc-button:pointerover">
-      <Setter Property="Background" Value="#2600E5FF" />
-    </Style>
-  </Window.Styles>
 
   <Grid>
     <Grid RowDefinitions="Auto,*" Margin="16">
@@ -66,7 +19,7 @@
       <ContentControl Name="TableHost" Grid.Row="1" />
     </Grid>
 
-    <Border Name="OverlayScrim" Background="#99000000" IsVisible="False">
+    <Border Name="OverlayScrim" Background="{DynamicResource CcScrimBrush}" IsVisible="False">
       <ContentControl Name="OverlayHost" />
     </Border>
   </Grid>

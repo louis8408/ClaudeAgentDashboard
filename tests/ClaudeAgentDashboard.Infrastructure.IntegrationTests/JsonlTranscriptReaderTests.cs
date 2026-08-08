@@ -1,3 +1,4 @@
+using ClaudeAgentDashboard.Domain;
 using ClaudeAgentDashboard.Infrastructure.Transcripts;
 
 namespace ClaudeAgentDashboard.Infrastructure.IntegrationTests;
@@ -5,7 +6,7 @@ namespace ClaudeAgentDashboard.Infrastructure.IntegrationTests;
 public class JsonlTranscriptReaderTests
 {
     [Fact]
-    public void ReadRecentEntries_Returns_The_Last_N_Lines_From_A_Real_File()
+    public void ReadRecentEntries_Returns_The_Last_N_Real_Conversational_Turns_Oldest_First()
     {
         var path = TempTranscriptPath();
         try
@@ -20,9 +21,57 @@ public class JsonlTranscriptReaderTests
             var reader = new JsonlTranscriptReader();
             var entries = reader.ReadRecentEntries(path, maxEntries: 2);
 
-            Assert.Equal(2, entries.Count);
-            Assert.Contains(entries, e => e.Contains("second", StringComparison.Ordinal));
-            Assert.Contains(entries, e => e.Contains("third", StringComparison.Ordinal));
+            Assert.Equal(
+                [new TranscriptEntry("assistant", "second"), new TranscriptEntry("assistant", "third")],
+                entries);
+        }
+        finally
+        {
+            TryDelete(path);
+        }
+    }
+
+    [Fact]
+    public void ReadRecentEntries_Excludes_NonChat_Lines_Like_Hook_Events_And_Metadata()
+    {
+        var path = TempTranscriptPath();
+        try
+        {
+            File.WriteAllLines(path,
+            [
+                """{"type":"assistant","message":{"content":"a real reply"}}""",
+                """{"type":"hook_success","hookName":"PreToolUse:PowerShell"}""",
+                """{"type":"last-prompt","lastPrompt":"something"}""",
+                """{"type":"attachment","attachment":{"type":"total_tokens_reminder"}}""",
+            ]);
+
+            var reader = new JsonlTranscriptReader();
+            var entries = reader.ReadRecentEntries(path, maxEntries: 10);
+
+            Assert.Equal([new TranscriptEntry("assistant", "a real reply")], entries);
+        }
+        finally
+        {
+            TryDelete(path);
+        }
+    }
+
+    [Fact]
+    public void ReadRecentEntries_Excludes_User_Turns_With_No_Extractable_Text_Such_As_Tool_Results()
+    {
+        var path = TempTranscriptPath();
+        try
+        {
+            File.WriteAllLines(path,
+            [
+                """{"type":"user","message":{"role":"user","content":[{"tool_use_id":"abc","type":"tool_result"}]}}""",
+                """{"type":"user","message":{"content":"a real question"}}""",
+            ]);
+
+            var reader = new JsonlTranscriptReader();
+            var entries = reader.ReadRecentEntries(path, maxEntries: 10);
+
+            Assert.Equal([new TranscriptEntry("user", "a real question")], entries);
         }
         finally
         {
@@ -45,7 +94,7 @@ public class JsonlTranscriptReaderTests
             var reader = new JsonlTranscriptReader();
             var entries = reader.ReadRecentEntries(path, maxEntries: 10);
 
-            Assert.Contains(entries, e => e.Contains("a real entry", StringComparison.Ordinal));
+            Assert.Equal([new TranscriptEntry("assistant", "a real entry")], entries);
         }
         finally
         {

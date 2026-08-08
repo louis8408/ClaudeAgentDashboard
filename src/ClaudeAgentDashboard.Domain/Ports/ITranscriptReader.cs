@@ -1,3 +1,5 @@
+using ClaudeAgentDashboard.Domain;
+
 namespace ClaudeAgentDashboard.Domain.Ports;
 
 /// <summary>
@@ -8,9 +10,11 @@ namespace ClaudeAgentDashboard.Domain.Ports;
 public interface ITranscriptReader
 {
     /// <summary>
-    /// The most recent <paramref name="maxEntries"/> renderable entries from the transcript at
-    /// <paramref name="transcriptPath"/>, oldest first. Returns an empty list — never throws —
-    /// if the file doesn't exist, isn't readable, or contains nothing renderable.
+    /// The most recent <paramref name="maxEntries"/> real conversational turns (role "user" or
+    /// "assistant" with extractable text) from the transcript at <paramref name="transcriptPath"/>,
+    /// oldest first. The transcript's other line types (hook events, attachments, metadata) are
+    /// filtered out, not surfaced. Returns an empty list — never throws — if the file doesn't
+    /// exist, isn't readable, or contains no such turns.
     /// </summary>
-    IReadOnlyList<string> ReadRecentEntries(string transcriptPath, int maxEntries);
+    IReadOnlyList<TranscriptEntry> ReadRecentEntries(string transcriptPath, int maxEntries);
 }

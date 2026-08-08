@@ -1,17 +1,17 @@
 using System.Text.Json;
+using ClaudeAgentDashboard.Domain;
 using ClaudeAgentDashboard.Domain.Ports;
 
 namespace ClaudeAgentDashboard.Infrastructure.Settings;
 
 /// <summary>
-/// Persists the small set of user preferences (launch-at-login, summary panel collapsed state)
-/// to a local JSON file under the OS per-user app-data directory (research.md R6, R8).
+/// Persists the small set of user preferences to a local JSON file under the OS per-user
+/// app-data directory (research.md R6, R8).
 ///
 /// Defaults <see cref="LaunchAtLoginEnabled"/> to false rather than the true implied by the
-/// spec's "expected to launch at login" assumption: there is no onboarding/settings UI yet
-/// to make that an informed, visible choice, and defaulting it on would silently register a
+/// spec's "expected to launch at login" assumption: defaulting it on would silently register a
 /// persistent OS autostart entry the first time this class is constructed — including during
-/// development and test runs. Flip the default once a real settings surface exists.
+/// development and test runs — before the user has made an informed, visible choice in Settings.
 /// </summary>
 public sealed class JsonSettingsStore : ISettingsStore
 {
@@ -45,6 +45,56 @@ public sealed class JsonSettingsStore : ISettingsStore
         set
         {
             _data = _data with { SummaryPanelCollapsed = value };
+            Save();
+        }
+    }
+
+    public bool NotifyOnIdle
+    {
+        get => _data.NotifyOnIdle;
+        set
+        {
+            _data = _data with { NotifyOnIdle = value };
+            Save();
+        }
+    }
+
+    public bool NotifyOnWaitingForInput
+    {
+        get => _data.NotifyOnWaitingForInput;
+        set
+        {
+            _data = _data with { NotifyOnWaitingForInput = value };
+            Save();
+        }
+    }
+
+    public bool NotifyOnEnded
+    {
+        get => _data.NotifyOnEnded;
+        set
+        {
+            _data = _data with { NotifyOnEnded = value };
+            Save();
+        }
+    }
+
+    public AppTheme Theme
+    {
+        get => _data.Theme;
+        set
+        {
+            _data = _data with { Theme = value };
+            Save();
+        }
+    }
+
+    public bool MinimizeToTrayOnClose
+    {
+        get => _data.MinimizeToTrayOnClose;
+        set
+        {
+            _data = _data with { MinimizeToTrayOnClose = value };
             Save();
         }
     }
@@ -88,8 +138,29 @@ public sealed class JsonSettingsStore : ISettingsStore
         File.WriteAllText(_filePath, JsonSerializer.Serialize(_data));
     }
 
-    private sealed record SettingsData(bool LaunchAtLoginEnabled, bool SummaryPanelCollapsed)
+    // The five new properties default to true/Dark via constructor parameter defaults, not just
+    // SettingsData.Empty — System.Text.Json's constructor-matching deserializer falls back to a
+    // missing parameter's OWN default when a property is absent from the JSON, not default(T).
+    // Without this, an existing settings.json written before these properties existed (this
+    // project's own JsonSettingsStoreTests + real usage already produced such files) would
+    // silently deserialize NotifyOnIdle/NotifyOnWaitingForInput/NotifyOnEnded/MinimizeToTrayOnClose
+    // as false instead of their intended true default.
+    private sealed record SettingsData(
+        bool LaunchAtLoginEnabled,
+        bool SummaryPanelCollapsed,
+        bool NotifyOnIdle = true,
+        bool NotifyOnWaitingForInput = true,
+        bool NotifyOnEnded = true,
+        AppTheme Theme = AppTheme.Dark,
+        bool MinimizeToTrayOnClose = true)
     {
-        public static SettingsData Empty => new(false, false);
+        public static SettingsData Empty => new(
+            LaunchAtLoginEnabled: false,
+            SummaryPanelCollapsed: false,
+            NotifyOnIdle: true,
+            NotifyOnWaitingForInput: true,
+            NotifyOnEnded: true,
+            Theme: AppTheme.Dark,
+            MinimizeToTrayOnClose: true);
     }
 }

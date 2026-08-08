@@ -20,23 +20,18 @@
   </UserControl.Styles>
   <Border Name="OverlayChrome" Classes="standard"
           CornerRadius="16" Padding="20"
-          BorderThickness="1" BorderBrush="#33FFFFFF"
+          BorderThickness="1" BorderBrush="{DynamicResource CcOverlayBorderBrush}"
+          Background="{DynamicResource CcOverlayBackgroundBrush}"
           BoxShadow="0 16 40 -10 #AA000000">
-    <Border.Background>
-      <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-        <GradientStop Color="#E6202024" Offset="0" />
-        <GradientStop Color="#F01A1A1E" Offset="1" />
-      </LinearGradientBrush>
-    </Border.Background>
     <DockPanel>
       <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto">
         <TextBlock Name="AgentLabelText" Grid.Column="0" FontWeight="SemiBold" FontSize="15"
-                   Foreground="White" TextWrapping="Wrap" />
+                   Foreground="{DynamicResource CcTextBrush}" TextWrapping="Wrap" />
         <Button Name="ExpandToggleButton" Grid.Column="1" Content="⤢" Click="OnExpandToggleClicked"
-                Background="Transparent" BorderThickness="0" Foreground="#AAFFFFFF"
+                Background="Transparent" BorderThickness="0" Foreground="{DynamicResource CcMutedTextBrush}"
                 CornerRadius="6" Padding="6,2" Margin="0,0,4,0" />
         <Button Grid.Column="2" Content="✕" Click="OnCloseClicked"
-                Background="Transparent" BorderThickness="0" Foreground="#AAFFFFFF"
+                Background="Transparent" BorderThickness="0" Foreground="{DynamicResource CcMutedTextBrush}"
                 CornerRadius="6" Padding="6,2" />
       </Grid>
       <TextBlock Name="MessageBanner" DockPanel.Dock="Bottom" Foreground="#FFC46B"
@@ -45,40 +40,45 @@
         <Button Name="ShowButton" Content="Show" Click="OnShowClicked"
                 Background="#3D7CFF" Foreground="White" CornerRadius="8" Padding="16,7" />
         <Button Name="DismissButton" Content="Dismiss" Click="OnDismissClicked" IsVisible="False"
-                Background="#26FFFFFF" Foreground="#DDFFFFFF" CornerRadius="8" Padding="16,7" />
+                Background="{DynamicResource CcSubtleFillBrush}" Foreground="{DynamicResource CcTextBrush}"
+                CornerRadius="8" Padding="16,7" />
       </StackPanel>
-      <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Spacing="10" Margin="0,16,0,0">
-          <Border Name="ActivityBadge" HorizontalAlignment="Left" CornerRadius="8" Padding="9,3">
-            <TextBlock Name="ActivityStateText" FontSize="12" FontWeight="Medium" />
-          </Border>
-          <TextBlock Name="ActivitySummaryText" Foreground="#CCFFFFFF" TextWrapping="Wrap" FontSize="13" />
-          <Border Name="HookSetupPanel" IsVisible="False" Background="#14FFFFFF" CornerRadius="8"
+      <Grid RowDefinitions="Auto,*" Margin="0,16,0,0">
+        <StackPanel Grid.Row="0" Spacing="10">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <Border Name="ActivityBadge" HorizontalAlignment="Left" CornerRadius="8" Padding="9,3">
+              <TextBlock Name="ActivityStateText" FontSize="12" FontWeight="Medium" />
+            </Border>
+            <Border Name="ModeBadge" HorizontalAlignment="Left" CornerRadius="8" Padding="9,3">
+              <TextBlock Name="ModeStateText" FontSize="12" FontWeight="Medium" />
+            </Border>
+          </StackPanel>
+          <TextBlock Name="ActivitySummaryText" Foreground="{DynamicResource CcTextBrush}" TextWrapping="Wrap" FontSize="13" />
+          <Border Name="HookSetupPanel" IsVisible="False" Background="{DynamicResource CcSubtleFillBrush}" CornerRadius="8"
                   Padding="12" Margin="0,4,0,0">
             <StackPanel Spacing="8">
-              <TextBlock Name="HookSetupExplanationText" Foreground="#BBFFFFFF" TextWrapping="Wrap"
+              <TextBlock Name="HookSetupExplanationText" Foreground="{DynamicResource CcMutedTextBrush}" TextWrapping="Wrap"
                          FontSize="12" />
               <Button Name="SetUpHooksButton" Content="Set up activity detection…"
                       Click="OnSetUpHooksClicked" HorizontalAlignment="Left"
-                      Background="#26FFFFFF" Foreground="White" CornerRadius="7" Padding="12,6"
-                      FontSize="12.5" />
+                      Background="{DynamicResource CcSubtleFillBrush}" Foreground="{DynamicResource CcTextBrush}"
+                      CornerRadius="7" Padding="12,6" FontSize="12.5" />
             </StackPanel>
           </Border>
-          <StackPanel Name="TranscriptSection" IsVisible="False" Spacing="6" Margin="0,4,0,0">
-            <TextBlock Text="Recent transcript" Foreground="#99FFFFFF" FontSize="11"
-                       FontWeight="Medium" />
-            <ItemsControl Name="TranscriptItems">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="x:String">
-                  <Border Background="#14FFFFFF" CornerRadius="6" Padding="8,6" Margin="0,0,0,4">
-                    <TextBlock Text="{Binding}" Foreground="#DDFFFFFF" TextWrapping="Wrap" FontSize="12" />
-                  </Border>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </StackPanel>
         </StackPanel>
-      </ScrollViewer>
+
+        <Grid Name="TranscriptSection" Grid.Row="1" IsVisible="False" RowDefinitions="Auto,*" Margin="0,10,0,0" MinHeight="0">
+          <!-- A ScrollViewer directly inside a StackPanel is offered unbounded height along
+               the stack axis and just grows to fit all content instead of clipping/scrolling
+               (confirmed by real rendering: bubbles overflowed past the card into the Show
+               button below) — a Grid "*" row genuinely bounds it, so scrolling actually works. -->
+          <TextBlock Grid.Row="0" Text="Recent conversation" Foreground="{DynamicResource CcMutedTextBrush}" FontSize="11"
+                     FontWeight="Medium" Margin="0,0,0,6" />
+          <ScrollViewer Name="TranscriptScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Name="TranscriptItems" Spacing="8" Margin="0,0,4,4" />
+          </ScrollViewer>
+        </Grid>
+      </Grid>
     </DockPanel>
   </Border>
 </UserControl>

@@ -1,5 +1,7 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
 using ClaudeAgentDashboard.Application.UseCases;
@@ -33,7 +35,7 @@ public partial class AgentDetailOverlay : UserControl
     public bool IsExpanded { get; private set; }
 
     public AgentDetailOverlay()
-        : this(DesignTimeSession(), null, null, null, null, null, null)
+        : this(DesignTimeSession(), null, null, null, null, null, null, null, null)
     {
     }
 
@@ -43,6 +45,8 @@ public partial class AgentDetailOverlay : UserControl
         DismissAgentCommand? dismissAgentCommand,
         ViewAgentActivityQuery? viewAgentActivityQuery,
         ViewAgentTranscriptQuery? viewAgentTranscriptQuery,
+        ViewAgentModeQuery? viewAgentModeQuery,
+        ViewAgentDisplayNameQuery? viewAgentDisplayNameQuery,
         IHookRegistrar? hookRegistrar,
         Uri? hookListenerBaseAddress)
     {
@@ -53,20 +57,29 @@ public partial class AgentDetailOverlay : UserControl
         _hookListenerBaseAddress = hookListenerBaseAddress;
 
         InitializeComponent();
-        AgentLabelText.Text = session.Label;
+        RenderDisplayName(viewAgentDisplayNameQuery);
         Render(viewAgentActivityQuery?.Execute(session.Id));
+        RenderMode(viewAgentModeQuery?.Execute(session.Id) ?? PermissionMode.Unknown);
         RenderTranscript(viewAgentTranscriptQuery?.Execute(session.Id));
 
-        if (viewAgentActivityQuery is not null || viewAgentTranscriptQuery is not null)
+        if (viewAgentActivityQuery is not null || viewAgentTranscriptQuery is not null || viewAgentModeQuery is not null)
         {
             _refreshTimer = new DispatcherTimer { Interval = RefreshInterval };
             _refreshTimer.Tick += (_, _) =>
             {
+                RenderDisplayName(viewAgentDisplayNameQuery);
                 Render(viewAgentActivityQuery?.Execute(session.Id));
+                RenderMode(viewAgentModeQuery?.Execute(session.Id) ?? PermissionMode.Unknown);
                 RenderTranscript(viewAgentTranscriptQuery?.Execute(session.Id));
             };
             _refreshTimer.Start();
         }
+    }
+
+    private void RenderDisplayName(ViewAgentDisplayNameQuery? viewAgentDisplayNameQuery)
+    {
+        var displayName = viewAgentDisplayNameQuery?.Execute(_session.Id);
+        AgentLabelText.Text = !string.IsNullOrWhiteSpace(displayName) ? displayName : _session.Label;
     }
 
     /// <summary>Stops the live-refresh timer — call when this overlay is hidden/removed.</summary>
@@ -163,20 +176,91 @@ public partial class AgentDetailOverlay : UserControl
 
     /// <summary>
     /// Read-only, informational only (FR-019/spec Assumptions) — this view offers no way to
-    /// send input back to the agent.
+    /// send input back to the agent. Rebuilt in full on every refresh (a bounded recent-N
+    /// list, not a stable identity list like the agent table's rows) with each turn rendered
+    /// as a chat bubble aligned by role, then auto-scrolled to the latest message.
     /// </summary>
-    private void RenderTranscript(IReadOnlyList<string>? entries)
+    private void RenderTranscript(IReadOnlyList<TranscriptEntry>? entries)
     {
         var hasEntries = entries is { Count: > 0 };
         TranscriptSection.IsVisible = hasEntries;
-        TranscriptItems.ItemsSource = hasEntries ? entries : null;
+
+        TranscriptItems.Children.Clear();
+        if (!hasEntries)
+        {
+            return;
+        }
+
+        foreach (var entry in entries!)
+        {
+            TranscriptItems.Children.Add(CreateChatBubble(entry));
+        }
+
+        // Posted at Loaded priority so it runs after the new bubbles have actually been
+        // measured/arranged — scrolling immediately would use the pre-update extent.
+        Dispatcher.UIThread.Post(() => TranscriptScrollViewer.ScrollToEnd(), DispatcherPriority.Loaded);
     }
+
+    private Border CreateChatBubble(TranscriptEntry entry)
+    {
+        var isUser = entry.Role == "user";
+        var accentBrush = FindResource<IBrush>(isUser ? "CcAccentBrush" : "CcMutedTextBrush");
+        var bubbleBrush = FindResource<IBrush>(isUser ? "CcAccentDimBrush" : "CcSubtleFillBrush");
+
+        var roleLabel = new TextBlock
+        {
+            Text = isUser ? "You" : "Claude",
+            FontSize = 10,
+            FontWeight = FontWeight.SemiBold,
+            Foreground = accentBrush,
+            Margin = new Thickness(0, 0, 0, 3),
+        };
+        var text = new TextBlock
+        {
+            Text = entry.Text,
+            Foreground = FindResource<IBrush>("CcTextBrush"),
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 12.5,
+        };
+        var content = new StackPanel();
+        content.Children.Add(roleLabel);
+        content.Children.Add(text);
+
+        return new Border
+        {
+            Child = content,
+            Background = bubbleBrush,
+            BorderBrush = FindResource<IBrush>("CcOverlayBorderBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(12, 8),
+            MaxWidth = 300,
+            HorizontalAlignment = isUser ? HorizontalAlignment.Right : HorizontalAlignment.Left,
+        };
+    }
+
+    /// <summary>
+    /// Resolves a theme resource by key from the Application-level dictionary (Theming.ThemeResources)
+    /// — used instead of XAML {DynamicResource} for controls built in code, since bubbles are
+    /// rebuilt fully on every refresh (so a static resolve-at-creation-time value is enough to
+    /// track a live theme change; no need for a true dynamic binding here).
+    /// </summary>
+    private static T FindResource<T>(string key) where T : class =>
+        Avalonia.Application.Current!.FindResource(key) as T ?? throw new InvalidOperationException($"Resource '{key}' not found.");
 
     private void SetActivityBadge(string text, Color color)
     {
         ActivityStateText.Text = text;
         ActivityStateText.Foreground = new SolidColorBrush(color);
         ActivityBadge.Background = new SolidColorBrush(color, 0.18);
+    }
+
+    private void RenderMode(PermissionMode mode)
+    {
+        var color = ModePresentation.ColorFor(mode);
+        ModeStateText.Text = ModePresentation.Describe(mode);
+        ModeStateText.Foreground = new SolidColorBrush(color);
+        ModeBadge.Background = new SolidColorBrush(color, 0.18);
     }
 
     private void OnCloseClicked(object? sender, RoutedEventArgs e) => CloseRequested?.Invoke(this, EventArgs.Empty);

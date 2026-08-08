@@ -3,9 +3,10 @@
              x:Class="ClaudeAgentDashboard.Presentation.Views.AgentTableView">
   <Border Classes="cc-panel" Padding="0">
     <Grid RowDefinitions="Auto,*">
-      <Grid Grid.Row="0" ColumnDefinitions="*,140" Margin="16,12,16,10">
+      <Grid Grid.Row="0" ColumnDefinitions="*,110,140" Margin="16,12,16,10">
         <TextBlock Grid.Column="0" Classes="cc-heading" Text="AGENT" />
-        <TextBlock Grid.Column="1" Classes="cc-heading" Text="STATUS" />
+        <TextBlock Grid.Column="1" Classes="cc-heading" Text="MODE" />
+        <TextBlock Grid.Column="2" Classes="cc-heading" Text="STATUS" />
       </Grid>
       <Border Grid.Row="0" VerticalAlignment="Bottom" Height="1" Background="{DynamicResource CcBorderBrush}" />
 

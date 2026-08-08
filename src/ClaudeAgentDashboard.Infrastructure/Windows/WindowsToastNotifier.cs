@@ -25,13 +25,35 @@ public sealed class WindowsToastNotifier : INotifier
 {
     private const string AppUserModelId = "ClaudeAgentDashboard";
 
+    private readonly string? _iconPath;
+
     public event Action<Guid>? NotificationActivated;
+
+    public WindowsToastNotifier()
+    {
+        // Without a Start Menu shortcut identifying this AppUserModelId, ToastNotifier.Show
+        // reports delivery as successful but Windows silently drops the toast — confirmed by
+        // real-world testing where NotifyAttention returned true yet no toast ever appeared.
+        // Registering (idempotent — a no-op once the shortcut already exists) is the standard
+        // fix for unpackaged Win32 apps and must happen before the first NotifyAttention call.
+        var executablePath = Environment.ProcessPath;
+        var candidateIconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "toast-icon.png");
+        _iconPath = File.Exists(candidateIconPath) ? candidateIconPath : null;
+
+        if (executablePath is not null)
+        {
+            var shortcutPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "Microsoft", "Windows", "Start Menu", "Programs", "Claude Agent Dashboard.lnk");
+            WindowsToastShortcutRegistrar.EnsureRegistered(shortcutPath, executablePath, AppUserModelId, _iconPath);
+        }
+    }
 
     public async Task<bool> NotifyAttention(AgentSession session, AttentionReason reason)
     {
         ArgumentNullException.ThrowIfNull(session);
 
-        var process = StartToastProcess(BuildShowScript(session.Label, reason));
+        var process = StartToastProcess(BuildShowScript(session.Label, reason, _iconPath));
         if (process is null)
         {
             return false;
@@ -116,14 +138,20 @@ public sealed class WindowsToastNotifier : INotifier
         }
     }
 
-    private static string BuildShowScript(string label, AttentionReason reason)
+    private static string BuildShowScript(string label, AttentionReason reason, string? iconPath)
     {
-        var message = Escape(DescribeReason(label, reason));
-        var title = Escape("Claude Agent Dashboard");
+        // The title is the agent's own label — the app's name/icon already appears in the
+        // toast's system-drawn header once the AppUserModelId resolves to a real Start Menu
+        // shortcut (WindowsToastShortcutRegistrar), so repeating "Claude Agent Dashboard" in
+        // the body would just be redundant.
+        var title = Escape(label);
+        var message = Escape(DescribeReason(reason));
+        var imageMarkup = iconPath is null
+            ? string.Empty
+            : $"""<image placement="appLogoOverride" hint-crop="circle" src="{Escape(ToFileUri(iconPath))}"/>""";
 
-        // Loads the WinRT toast types, shows the toast under a fixed AppUserModelId (no
-        // shortcut/registration required on Windows 10 1809+), and reports whether the OS
-        // actually has notifications enabled for that id.
+        // Loads the WinRT toast types, shows the toast under a fixed AppUserModelId, and
+        // reports whether the OS actually has notifications enabled for that id.
         //
         // Click-to-activate is best-effort only: Windows PowerShell 5.1 (the default
         // "powershell.exe" on any Windows box without PowerShell 7 installed) refuses to
@@ -139,7 +167,7 @@ public sealed class WindowsToastNotifier : INotifier
             [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] > $null
             $ErrorActionPreference = 'Stop'
             try {
-                $template = '<toast><visual><binding template="ToastGeneric"><text>{{title}}</text><text>{{message}}</text></binding></visual></toast>'
+                $template = '<toast><visual><binding template="ToastGeneric">{{imageMarkup}}<text>{{title}}</text><text>{{message}}</text></binding></visual></toast>'
                 $xml = New-Object Windows.Data.Xml.Dom.XmlDocument
                 $xml.LoadXml($template)
                 $toast = New-Object Windows.UI.Notifications.ToastNotification $xml
@@ -169,13 +197,15 @@ public sealed class WindowsToastNotifier : INotifier
             """;
     }
 
-    private static string DescribeReason(string label, AttentionReason reason) => reason switch
+    private static string DescribeReason(AttentionReason reason) => reason switch
     {
-        AttentionReason.Idle => $"'{label}' is idle and waiting for your next instruction.",
-        AttentionReason.WaitingForInput => $"'{label}' needs your input.",
-        AttentionReason.Ended => $"'{label}' has ended.",
-        _ => $"'{label}' needs your attention.",
+        AttentionReason.Idle => "Idle — waiting for your next instruction.",
+        AttentionReason.WaitingForInput => "Needs your input.",
+        AttentionReason.Ended => "Session has ended.",
+        _ => "Needs your attention.",
     };
+
+    private static string ToFileUri(string path) => new Uri(path).AbsoluteUri;
 
     private static string Escape(string value) => value.Replace("'", "''", StringComparison.Ordinal);
 }

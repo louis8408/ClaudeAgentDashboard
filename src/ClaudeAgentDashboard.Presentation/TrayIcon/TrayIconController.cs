@@ -30,12 +30,18 @@ public sealed class TrayIconController : IDisposable
     /// <summary>Raised when the user clicks the tray/menu-bar icon (User Story 1).</summary>
     public event EventHandler? DashboardRequested;
 
+    /// <summary>Raised when the user picks "Settings…" from the tray menu.</summary>
+    public event EventHandler? SettingsRequested;
+
     public TrayIconController(OpenDashboardQuery? openDashboardQuery = null, IHookRegistrar? hookRegistrar = null, Uri? hookListenerBaseAddress = null)
     {
         _quitItem = new NativeMenuItem("Quit");
         _quitItem.Click += OnQuitClicked;
 
-        var menu = new NativeMenu { Items = { _quitItem } };
+        var settingsItem = new NativeMenuItem("Settings…");
+        settingsItem.Click += (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty);
+
+        var menu = new NativeMenu { Items = { settingsItem, _quitItem } };
 
         if (hookRegistrar is not null && hookListenerBaseAddress is not null)
         {

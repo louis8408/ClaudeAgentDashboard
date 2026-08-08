@@ -1,0 +1,41 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ClaudeAgentDashboard.Presentation.Views.SettingsWindow"
+        Title="Claude Agent Dashboard — Settings"
+        Width="380" Height="480" CanResize="False"
+        Background="{DynamicResource CcBackgroundBrush}"
+        WindowStartupLocation="CenterScreen">
+  <ScrollViewer Padding="16">
+    <StackPanel Spacing="14">
+
+      <Border Classes="cc-panel">
+        <StackPanel Spacing="10" Margin="16,14">
+          <TextBlock Classes="cc-heading" Text="ALERT ME WHEN AN AGENT" />
+          <CheckBox Name="NotifyOnIdleCheckBox" Content="Goes idle" Click="OnNotifyOnIdleClicked" />
+          <CheckBox Name="NotifyOnWaitingForInputCheckBox" Content="Needs input" Click="OnNotifyOnWaitingForInputClicked" />
+          <CheckBox Name="NotifyOnEndedCheckBox" Content="Session ends" Click="OnNotifyOnEndedClicked" />
+        </StackPanel>
+      </Border>
+
+      <Border Classes="cc-panel">
+        <StackPanel Spacing="10" Margin="16,14">
+          <TextBlock Classes="cc-heading" Text="APPEARANCE" />
+          <StackPanel Orientation="Horizontal" Spacing="16">
+            <RadioButton Name="DarkThemeRadioButton" Content="Dark" GroupName="Theme" Click="OnThemeChanged" />
+            <RadioButton Name="LightThemeRadioButton" Content="Light" GroupName="Theme" Click="OnThemeChanged" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Classes="cc-panel">
+        <StackPanel Spacing="10" Margin="16,14">
+          <TextBlock Classes="cc-heading" Text="STARTUP &amp; WINDOW" />
+          <CheckBox Name="LaunchAtLoginCheckBox" Content="Launch at login" Click="OnLaunchAtLoginClicked" />
+          <CheckBox Name="MinimizeToTrayCheckBox" Content="Minimize to tray when closed" Click="OnMinimizeToTrayClicked" />
+        </StackPanel>
+      </Border>
+
+      <Button Content="Close" Classes="cc-button" HorizontalAlignment="Right" Click="OnCloseClicked" />
+    </StackPanel>
+  </ScrollViewer>
+</Window>

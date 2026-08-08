@@ -58,6 +58,12 @@ public static class CompositionRoot
         services.AddSingleton<FleetMetricsHistory>();
         services.AddSingleton<ViewFleetSummaryQuery>();
 
+        services.AddSingleton<IPermissionModeReader, JsonlPermissionModeReader>();
+        services.AddSingleton<ViewAgentModeQuery>();
+
+        services.AddSingleton<IAgentTitleReader, JsonlAgentTitleReader>();
+        services.AddSingleton<ViewAgentDisplayNameQuery>();
+
         var provider = services.BuildServiceProvider();
         WireEventSubscriptions(provider);
         ApplyLoginItemSetting(provider);
@@ -72,15 +78,7 @@ public static class CompositionRoot
     private static void ApplyLoginItemSetting(IServiceProvider provider)
     {
         var enabled = provider.GetRequiredService<ISettingsStore>().LaunchAtLoginEnabled;
-
-        if (OperatingSystem.IsWindows())
-        {
-            new WindowsLoginItemRegistrar().SetEnabled(enabled);
-        }
-        else if (OperatingSystem.IsMacOS())
-        {
-            new MacLoginItemRegistrar().SetEnabled(enabled);
-        }
+        provider.GetService<ILoginItemRegistrar>()?.SetEnabled(enabled);
     }
 
     /// <summary>
@@ -107,8 +105,7 @@ public static class CompositionRoot
         services.AddSingleton<IAgentWatcher, WindowsProcessAgentWatcher>();
         services.AddSingleton<IWindowFocuser, Win32WindowFocuser>();
         services.AddSingleton<INotifier, WindowsToastNotifier>();
-
-        // ISettingsStore -> JsonSettingsStore (Polish)
+        services.AddSingleton<ILoginItemRegistrar, WindowsLoginItemRegistrar>();
     }
 
     [SupportedOSPlatform("macos")]
@@ -117,7 +114,6 @@ public static class CompositionRoot
         services.AddSingleton<IAgentWatcher, MacProcessAgentWatcher>();
         services.AddSingleton<IWindowFocuser, MacWindowFocuser>();
         services.AddSingleton<INotifier, MacUserNotifier>();
-
-        // ISettingsStore -> JsonSettingsStore (Polish)
+        services.AddSingleton<ILoginItemRegistrar, MacLoginItemRegistrar>();
     }
 }

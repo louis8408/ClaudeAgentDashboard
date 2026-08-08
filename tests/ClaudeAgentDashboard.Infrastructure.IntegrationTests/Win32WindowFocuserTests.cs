@@ -74,6 +74,62 @@ public class Win32WindowFocuserTests
         Assert.Equal(FocusResult.WindowNoLongerAvailable, result);
     }
 
+    // Reproduces the real-world VS-integrated-terminal bug: a console app's own process owns
+    // no top-level window at all (confirmed empirically — Claude Code running under Visual
+    // Studio's terminal has MainWindowHandle == 0; the visible window belongs to devenv.exe,
+    // an ancestor process). The "child" here is this test process's own PID, which likewise
+    // owns no top-level GUI window — a real, always-true stand-in for "a console app with no
+    // window of its own" — with its "parent" faked via the injectable lookup to point at a
+    // real window-owning process (charmap.exe), so the walk-up-the-ancestor-chain logic is
+    // exercised against real Win32 window APIs without needing to fabricate an actual OS-level
+    // multi-generation process tree.
+    [SkippableFact]
+    public void Focus_Walks_Up_To_An_Ancestor_Process_That_Owns_The_Window()
+    {
+        Skip.IfNot(OperatingSystem.IsWindows());
+
+        using var charmap = StartNotepad();
+        try
+        {
+            var handle = WaitForMainWindowHandle(charmap);
+            ShowWindow(handle, SW_MINIMIZE);
+            WaitUntil(() => IsIconic(handle));
+
+            var windowlessChildPid = Environment.ProcessId;
+            var focuser = new Win32WindowFocuser(
+                getParentProcessId: pid => pid == windowlessChildPid ? charmap.Id : null,
+                processExists: _ => true);
+            var reference = new TerminalWindowReference(windowlessChildPid);
+
+            var result = focuser.Focus(reference);
+
+            Assert.Equal(FocusResult.Focused, result);
+            Assert.True(reference.IsResolvable);
+            WaitUntil(() => !IsIconic(handle));
+            Assert.False(IsIconic(handle));
+        }
+        finally
+        {
+            TryKill(charmap);
+        }
+    }
+
+    [SkippableFact]
+    public void Focus_Does_Not_Permanently_Mark_Unresolvable_When_The_Process_Is_Still_Alive_But_No_Ancestor_Owns_A_Window()
+    {
+        Skip.IfNot(OperatingSystem.IsWindows());
+
+        var focuser = new Win32WindowFocuser(
+            getParentProcessId: _ => null,
+            processExists: _ => true);
+        var reference = new TerminalWindowReference(Environment.ProcessId);
+
+        var result = focuser.Focus(reference);
+
+        Assert.Equal(FocusResult.WindowNoLongerAvailable, result);
+        Assert.True(reference.IsResolvable);
+    }
+
     // charmap.exe (Character Map) is used instead of notepad.exe: on modern Windows,
     // "notepad.exe" resolves to an MSIX-packaged app whose launching process is a stub
     // that hands off to a differently-PID'd process, so the returned Process never gets

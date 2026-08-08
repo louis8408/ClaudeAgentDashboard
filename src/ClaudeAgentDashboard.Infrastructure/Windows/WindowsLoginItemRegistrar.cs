@@ -1,4 +1,5 @@
 using System.Runtime.Versioning;
+using ClaudeAgentDashboard.Domain.Ports;
 using Microsoft.Win32;
 
 namespace ClaudeAgentDashboard.Infrastructure.Windows;
@@ -8,7 +9,7 @@ namespace ClaudeAgentDashboard.Infrastructure.Windows;
 /// (spec Assumptions), gated by <see cref="ClaudeAgentDashboard.Domain.Ports.ISettingsStore.LaunchAtLoginEnabled"/>.
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed class WindowsLoginItemRegistrar
+public sealed class WindowsLoginItemRegistrar : ILoginItemRegistrar
 {
     private const string DefaultRunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string ValueName = "ClaudeAgentDashboard";

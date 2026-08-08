@@ -4,7 +4,66 @@
              RequestedThemeVariant="Default">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
 
+    <!--
+      Command-center theme resources (dark/light palettes) live here, not per-Window, so every
+      Window (DesktopWindow, SettingsWindow) and every child control shares one set that
+      Theming.ThemeResources.Apply(...) can swap live. The values below are just placeholders
+      so design-time preview isn't broken — Apply() always overwrites them at startup before
+      any real window is constructed.
+    -->
+    <Application.Resources>
+        <SolidColorBrush x:Key="CcAccentBrush" Color="#00E5FF" />
+        <SolidColorBrush x:Key="CcAccentDimBrush" Color="#5C00E5FF" />
+        <SolidColorBrush x:Key="CcTextBrush" Color="#E8FBFF" />
+        <SolidColorBrush x:Key="CcMutedTextBrush" Color="#8FB4BD" />
+        <SolidColorBrush x:Key="CcBorderBrush" Color="#3300E5FF" />
+        <SolidColorBrush x:Key="CcPanelBrush" Color="#B30A0F16" />
+        <SolidColorBrush x:Key="CcSubtleFillBrush" Color="#1AFFFFFF" />
+        <SolidColorBrush x:Key="CcOverlayBorderBrush" Color="#33FFFFFF" />
+        <SolidColorBrush x:Key="CcScrimBrush" Color="#99000000" />
+        <FontFamily x:Key="CcFontFamily">Consolas,Menlo,Monospace</FontFamily>
+        <LinearGradientBrush x:Key="CcBackgroundBrush" StartPoint="0%,0%" EndPoint="100%,100%">
+            <GradientStop Color="#FF05070C" Offset="0" />
+            <GradientStop Color="#FF0A0F16" Offset="0.55" />
+            <GradientStop Color="#FF060A10" Offset="1" />
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="CcOverlayBackgroundBrush" StartPoint="0%,0%" EndPoint="100%,100%">
+            <GradientStop Color="#E6202024" Offset="0" />
+            <GradientStop Color="#F01A1A1E" Offset="1" />
+        </LinearGradientBrush>
+    </Application.Resources>
+
     <Application.Styles>
         <FluentTheme />
+
+        <Style Selector="TextBlock">
+            <Setter Property="FontFamily" Value="{DynamicResource CcFontFamily}" />
+        </Style>
+        <Style Selector="Border.cc-panel">
+            <Setter Property="Background" Value="{DynamicResource CcPanelBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CcBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="BoxShadow" Value="0 0 18 -6 #4000E5FF" />
+        </Style>
+        <Style Selector="TextBlock.cc-heading">
+            <Setter Property="Foreground" Value="{DynamicResource CcAccentBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="LetterSpacing" Value="1.5" />
+        </Style>
+        <Style Selector="Button.cc-button">
+            <Setter Property="Background" Value="{DynamicResource CcAccentDimBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource CcTextBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CcBorderBrush}" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontFamily" Value="{DynamicResource CcFontFamily}" />
+        </Style>
+        <Style Selector="Button.cc-button:pointerover">
+            <Setter Property="Background" Value="{DynamicResource CcAccentBrush}" />
+        </Style>
     </Application.Styles>
 </Application>

@@ -13,12 +13,13 @@ public class ViewAgentTranscriptQueryTests
         session.ApplySignal(new ActivitySignal(
             "agent", HookEvent.PreToolUse, DateTimeOffset.UtcNow, transcriptPath: @"C:\transcripts\a.jsonl"));
         var registry = new AgentSessionRegistry(new FakeAgentWatcher([session]));
-        var reader = new FakeTranscriptReader(["entry one", "entry two"]);
+        var entries = new[] { new TranscriptEntry("user", "entry one"), new TranscriptEntry("assistant", "entry two") };
+        var reader = new FakeTranscriptReader(entries);
         var query = new ViewAgentTranscriptQuery(registry, reader);
 
         var result = query.Execute(session.Id);
 
-        Assert.Equal(["entry one", "entry two"], result);
+        Assert.Equal(entries, result);
         Assert.Equal(@"C:\transcripts\a.jsonl", reader.LastRequestedPath);
     }
 
@@ -27,7 +28,7 @@ public class ViewAgentTranscriptQueryTests
     {
         var session = new AgentSession(Guid.NewGuid(), "agent", DateTimeOffset.UtcNow, new TerminalWindowReference(1));
         var registry = new AgentSessionRegistry(new FakeAgentWatcher([session]));
-        var reader = new FakeTranscriptReader(["should not be returned"]);
+        var reader = new FakeTranscriptReader([new TranscriptEntry("assistant", "should not be returned")]);
         var query = new ViewAgentTranscriptQuery(registry, reader);
 
         var result = query.Execute(session.Id);
@@ -57,11 +58,11 @@ public class ViewAgentTranscriptQueryTests
         public IReadOnlyCollection<AgentSession> GetCurrentSessions() => sessions;
     }
 
-    private sealed class FakeTranscriptReader(IReadOnlyList<string> entries) : ITranscriptReader
+    private sealed class FakeTranscriptReader(IReadOnlyList<TranscriptEntry> entries) : ITranscriptReader
     {
         public string? LastRequestedPath { get; private set; }
 
-        public IReadOnlyList<string> ReadRecentEntries(string transcriptPath, int maxEntries)
+        public IReadOnlyList<TranscriptEntry> ReadRecentEntries(string transcriptPath, int maxEntries)
         {
             LastRequestedPath = transcriptPath;
             return entries;

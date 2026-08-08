@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using ClaudeAgentDashboard.Application.UseCases;
 using ClaudeAgentDashboard.Domain;
 
 namespace ClaudeAgentDashboard.Presentation.Views;
@@ -14,6 +15,8 @@ namespace ClaudeAgentDashboard.Presentation.Views;
 public partial class AgentTableView : UserControl
 {
     private readonly Dictionary<Guid, RowElements> _rows = [];
+    private ViewAgentModeQuery? _viewAgentModeQuery;
+    private ViewAgentDisplayNameQuery? _viewAgentDisplayNameQuery;
 
     /// <summary>Raised when a row is clicked (not a "Show" action — there isn't one on the row itself).</summary>
     public event EventHandler<AgentSession>? AgentClicked;
@@ -24,8 +27,13 @@ public partial class AgentTableView : UserControl
     }
 
     /// <summary>Adds/updates a row per session and removes rows for sessions no longer present.</summary>
-    public void Render(IReadOnlyCollection<AgentSession> sessions)
+    public void Render(
+        IReadOnlyCollection<AgentSession> sessions,
+        ViewAgentModeQuery? viewAgentModeQuery = null,
+        ViewAgentDisplayNameQuery? viewAgentDisplayNameQuery = null)
     {
+        _viewAgentModeQuery = viewAgentModeQuery;
+        _viewAgentDisplayNameQuery = viewAgentDisplayNameQuery;
         var seenIds = new HashSet<Guid>();
 
         foreach (var session in sessions)
@@ -57,21 +65,29 @@ public partial class AgentTableView : UserControl
     {
         var label = new TextBlock
         {
-            FontSize = 13, Foreground = Brushes.White, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            FontSize = 13, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis,
         };
+        var modeText = new TextBlock { FontSize = 11, FontWeight = Avalonia.Media.FontWeight.Medium };
+        var modeBadge = new Border
+        {
+            CornerRadius = new Avalonia.CornerRadius(7), Padding = new Avalonia.Thickness(8, 2),
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left, Child = modeText,
+        };
         var statusText = new TextBlock { FontSize = 11, FontWeight = Avalonia.Media.FontWeight.Medium };
-        var badge = new Border
+        var statusBadge = new Border
         {
             CornerRadius = new Avalonia.CornerRadius(7), Padding = new Avalonia.Thickness(8, 2),
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left, Child = statusText,
         };
 
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,140") };
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,110,140") };
         Grid.SetColumn(label, 0);
-        Grid.SetColumn(badge, 1);
+        Grid.SetColumn(modeBadge, 1);
+        Grid.SetColumn(statusBadge, 2);
         grid.Children.Add(label);
-        grid.Children.Add(badge);
+        grid.Children.Add(modeBadge);
+        grid.Children.Add(statusBadge);
 
         var root = new Border
         {
@@ -86,18 +102,28 @@ public partial class AgentTableView : UserControl
             }
         };
 
-        return new RowElements(root, label, badge, statusText);
+        return new RowElements(root, label, modeBadge, modeText, statusBadge, statusText);
     }
 
-    private static void Bind(RowElements row, AgentSession session)
+    private void Bind(RowElements row, AgentSession session)
     {
-        row.Label.Text = session.Label;
-        row.Status.Text = ActivityPresentation.DescribeCardStatus(session);
+        row.Label.Text = _viewAgentDisplayNameQuery?.Execute(session.Id) is { } displayName && !string.IsNullOrWhiteSpace(displayName)
+            ? displayName
+            : session.Label;
+        row.Label.Foreground = Avalonia.Application.Current!.FindResource("CcTextBrush") as IBrush ?? Brushes.White;
 
-        var color = ActivityPresentation.ColorFor(session.SessionState, session.ActivityState);
-        row.Status.Foreground = new SolidColorBrush(color);
-        row.Badge.Background = new SolidColorBrush(color, 0.16);
+        var mode = _viewAgentModeQuery?.Execute(session.Id) ?? PermissionMode.Unknown;
+        row.ModeText.Text = ModePresentation.Describe(mode);
+        var modeColor = ModePresentation.ColorFor(mode);
+        row.ModeText.Foreground = new SolidColorBrush(modeColor);
+        row.ModeBadge.Background = new SolidColorBrush(modeColor, 0.16);
+
+        row.Status.Text = ActivityPresentation.DescribeCardStatus(session);
+        var statusColor = ActivityPresentation.ColorFor(session.SessionState, session.ActivityState);
+        row.Status.Foreground = new SolidColorBrush(statusColor);
+        row.StatusBadge.Background = new SolidColorBrush(statusColor, 0.16);
     }
 
-    private sealed record RowElements(Border Root, TextBlock Label, Border Badge, TextBlock Status);
+    private sealed record RowElements(
+        Border Root, TextBlock Label, Border ModeBadge, TextBlock ModeText, Border StatusBadge, TextBlock Status);
 }
