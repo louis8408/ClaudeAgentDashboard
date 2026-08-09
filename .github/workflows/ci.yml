@@ -74,11 +74,21 @@ jobs:
           /o:"louis8408"
           /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
           /d:sonar.host.url="https://sonarcloud.io"
+          /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"
+          /d:sonar.exclusions="**/bin/**,**/obj/**"
+          /d:sonar.test.exclusions="**/bin/**,**/obj/**"
 
       - name: Restore & Build
         run: |
           dotnet restore ClaudeAgentDashboard.sln
           dotnet build ClaudeAgentDashboard.sln --no-restore --configuration Release
+
+      - name: Test with coverage
+        run: >
+          dotnet test ClaudeAgentDashboard.sln --no-build --configuration Release
+          --collect:"XPlat Code Coverage"
+          --settings coverlet.runsettings
+          --results-directory ./coverage
 
       - name: Sonar end
         env:
